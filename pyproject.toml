@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "leafs_clippers"
+version = "1.0.0"
+authors = [
+  { name="Alexander Holas", email="alexander.holas@h-its.org" },
+]
+description = "A collection of scripts and tools to post-process LEAFS-II snapshots"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v2.0",
+    "Operating System :: OS Independent",
+]
+
+[project.scripts]
+clipper-gen-inipos = "leafs_clippers:gen_inipos.cli"
+
+[project.urls]
+"Homepage" = "https://github.com/AlexHls/leafs-clippers"
+"Bug Tracker" = "https://github.com/AlexHls/leafs-clippers/issues"
