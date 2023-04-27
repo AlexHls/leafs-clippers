@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.io import FortranFile
 
+
 def sphere(r, c):
     n = 100
     u = np.linspace(0, 2 * np.pi, n)
@@ -71,7 +72,7 @@ def create_gaussian_bubbles(n_bub, r_cen, r_sphere):
     radius = rng.normal(0, r_sphere, size=n_bub)
     theta = rng.uniform(low=0, high=np.pi, size=n_bub)
     phi = rng.uniform(low=0, high=2 * np.pi, size=n_bub)
-    
+
     # Take the absolute of the radius
     radius = np.abs(radius)
 
@@ -106,7 +107,7 @@ def main(
 
     print("Writing inipos files...")
 
-    f = FortranFile(outname, 'w')
+    f = FortranFile(outname, "w")
 
     f.write_record(np.array([n_bub], dtype=np.int32))
     f.write_record(np.array([r_bub]))
