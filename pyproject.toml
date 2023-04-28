@@ -20,6 +20,7 @@ classifiers = [
 [project.scripts]
 clipper-gen-inipos = "leafs_clippers:gen_inipos.cli"
 clipper-prepare-pp = "leafs_clippers:prepare_postprocessing.cli"
+clipper-rewrite-tracer = "leafs_clippers:rewrite_tracer.cli"
 
 [project.urls]
 "Homepage" = "https://github.com/AlexHls/leafs-clippers"

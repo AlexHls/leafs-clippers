@@ -59,6 +59,7 @@ class LeafsTracer:
                 filename = os.path.join(snappath, self.name + "%03d.trace" % i)
 
             self.nfiles = len(self.files)
+            assert self.nfiles > 0, "No tracer files found!"
 
         print("Starttimes: ", self.starttimes)
         return
@@ -163,6 +164,118 @@ class LeafsTracer:
             return utilities.dict2obj(
                 {"data": data, "nvalues": self.nvalues, "time": time}
             )
+
+    def get_times(self, quiet=False):
+        if not quiet:
+            print("Getting the number of tracer timesteps")
+        ntimesteps = 0
+        times = []
+        for i in range(self.nfiles):
+            if not quiet:
+                print("Doing file " + self.files[i])
+
+            f = open(self.files[i], "rb")
+            if i == 0:
+                f.seek(self.headerlen, 0)
+
+            dum1 = f.read(4)
+            while len(dum1) > 0:
+                (t,) = struct.unpack("<d", f.read(8))
+                times.append(t)
+                f.seek(int(4 * self.npart * (self.nvalues - 1)), 1)
+
+                if (i == self.nfiles - 1) or (t < self.starttimes[i + 1]):
+                    ntimesteps += 1
+                else:
+                    break
+
+                if ntimesteps % 10000 == 0 and not quiet:
+                    print("Timesteps currently: %d" % ntimesteps)
+
+                _ = f.read(4)
+                dum1 = f.read(4)
+            f.close()
+
+        if not quiet:
+            print("Total number of timesteps: ", len(times))
+            print("Time runs from ", times[0], " to ", times[-1])
+        return np.array(times)
+
+    def get_timestep(
+        self,
+        tstep,
+        chunksize=None,
+        read_count=0,
+        usefile=None,
+        threed=True,
+        quiet=False,
+    ):
+        index = tstep
+        fileid = 0
+        if usefile is None:
+            for fileid in range(self.nfiles):
+                count = 0
+                f = open(self.files[fileid], "rb")
+                if fileid == 0:
+                    f.seek(self.headerlen, 0)
+
+                dum1 = f.read(4)
+                while len(dum1) > 0:
+                    (time,) = struct.unpack("<d", f.read(8))
+                    f.seek(int(4 * self.npart * (self.nvalues - 1)), 1)
+                    if (fileid == self.nfiles - 1) or (
+                        time < self.starttimes[fileid + 1]
+                    ):
+                        count += 1
+                    else:
+                        break
+
+                    _ = f.read(4)
+                    dum1 = f.read(4)
+                f.close()
+
+                if index >= count:
+                    index -= count
+                else:
+                    break
+        else:
+            fileid = usefile
+
+        f = open(self.files[fileid], "rb")
+        if fileid == 0:
+            f.seek(self.headerlen, 0)
+
+        f.seek((self.npart * (self.nvalues - 1) * 4 + 8 + 8) * index, 1)
+
+        _ = f.read(4)
+        (ttime,) = struct.unpack("<d", f.read(8))
+
+        if not quiet:
+            print(
+                "Loading data of timestep %d at index %d of file %d at time %g."
+                % (tstep, index, fileid, ttime)
+            )
+        if chunksize != self.npart and chunksize is not None:
+            assert threed, "Chunking only works in 3D!"
+            assert (
+                chunksize + read_count <= self.npart
+            ), "Chunsize bigger than number of particles!"
+            data = np.zeros((chunksize, 6))
+            offset = f.tell()
+            for i in range(6):
+                f.seek(offset + (self.npart * 4 * i) + read_count * 4, 0)
+                data[:, i] = np.fromfile(f, dtype="float32", count=chunksize)
+            data = data.T
+        else:
+            data = np.fromfile(
+                f, dtype="float32", count=self.npart * (self.nvalues - 1)
+            ).reshape(self.nvalues - 1, self.npart)
+        f.close()
+
+        if threed:
+            return data[:6, :], ttime
+        else:
+            return data[:5, :], ttime
 
 
 class LeafsTracerUtil(object):
