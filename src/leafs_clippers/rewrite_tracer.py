@@ -1,4 +1,3 @@
-import os
 import gc
 import time
 import struct
@@ -10,8 +9,16 @@ from leafs_clippers.util.const import M_SOL
 from leafs_clippers import leafs_tracer
 
 
-def main(model, outfile, snappath="./"):
+def main(model, outfile, snappath="./", chunksize=2.5, verbose=False):
     fin = leafs_tracer.LeafsTracer(model, snappath=snappath)
+
+    # Check if file is in one single file
+    # If not, merge into one file and transpose that file
+    if fin.nfiles > 1:
+        print("Multiple tracer files detected, merging them into one file...")
+        mergedfile = fin.mergefiles()
+        fin = leafs_tracer.LeafsTracer(model, snappath=snappath, file=mergedfile)
+
     fout = open(outfile, "wb")
 
     ntracer = fin.npart
@@ -24,13 +31,15 @@ def main(model, outfile, snappath="./"):
     times = fin.get_times()
     ntimesteps = len(times)
     print("Getting timesteps took %ds" % (time.time() - start))
+    print("Found %d tracers with %d timesteps" % (ntracer, ntimesteps))
 
     fout.write(struct.pack("iiiii", ntracer, 1, ntracer, ntimesteps, 6))
     masses.tofile(fout)
     times.tofile(fout)
 
-    # 1GB Buffer
-    read_chunk = 2 * 10**11 // (6 * ntimesteps * 10 * 8)
+    # Set buffer size
+    read_chunk = int((chunksize * 8e9) // (6 * ntimesteps * 10 * 8))
+    print("Chunksize = %.1fGB" % chunksize)
     print("Reading ", read_chunk, " tracers per chunk.")
 
     read_count = 0
@@ -53,14 +62,15 @@ def main(model, outfile, snappath="./"):
 
         print("Writing chunk size %d starting from %d." % (read_chunk, read_count))
         for itracer in range(read_chunk):
-            print(
-                "Tracer %6d: rho= %g - %g"
-                % (
-                    itracer + read_count,
-                    data[itracer, :, 3].min(),
-                    data[itracer, :, 3].max(),
+            if verbose:
+                print(
+                    "Tracer %6d: rho= %g - %g"
+                    % (
+                        itracer + read_count,
+                        data[itracer, :, 3].min(),
+                        data[itracer, :, 3].max(),
+                    )
                 )
-            )
             data[itracer, :, :].T.tofile(fout)
 
         print(
@@ -95,6 +105,14 @@ def cli():
         help="Path to the output directory where snapshots are stored",
         default="./",
     )
+    parser.add_argument(
+        "-c",
+        "--chunksize",
+        help="Chunksize of tracers to be transposed per loop in GB",
+        type=float,
+        default=2.5,
+    )
+    parser.add_argument("--verbose", help="Enables verbose output", action="store_true")
 
     args = parser.parse_args()
 
@@ -102,6 +120,8 @@ def cli():
         args.model,
         args.outfile,
         snappath=args.snappath,
+        chunksize=args.chunksize,
+        verbose=args.verbose,
     )
     return
 

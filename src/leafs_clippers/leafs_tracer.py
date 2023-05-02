@@ -277,6 +277,101 @@ class LeafsTracer:
         else:
             return data[:5, :], ttime
 
+    def mergefiles(self, timeoffsets=[], outname=None):
+        if len(timeoffsets) == 0:
+            timeoffsets = np.zeros(self.nfiles)
+        else:
+            assert (
+                len(timeoffsets) != self.nfiles
+            ), "timeoffsets {0} has to be of the same size as the number of files {1}.".format(
+                len(timeoffsets), self.nfiles
+            )
+
+        if not outname:
+            outname = "{0}_merged000.trace".format(self.name)
+
+        fout = open(outname, "wb")
+
+        for fid in range(self.nfiles):
+            fin = open(self.files[fid], "rb")
+
+            if fid == 0:
+                fout.write(fin.read(self.headerlen))
+
+            datastart = fin.tell()
+            fin.seek(0, 2)  # end
+            dataend = fin.tell()
+            fin.seek(datastart, 0)
+
+            blocksize = self.npart * (self.nvalues - 1) * 4 + 16
+            blockcount = int((dataend - datastart) / blocksize)
+
+            if (dataend - datastart) % blocksize != 0:
+                print(
+                    "Tracer file {0} is inconsistent: headersize={1}, blocksize={2}, modulo={3}.".format(
+                        fid, datastart, blocksize, (dataend - datastart) % blocksize
+                    )
+                )
+                fin.close()
+                fout.close()
+                raise ValueError()
+
+            useblock = np.zeros(blockcount, dtype=np.bool8)
+            blocktimes = np.zeros(blockcount)
+
+            count = 0
+
+            dum1 = fin.read(4)
+            while len(dum1) > 0:
+                (time,) = struct.unpack("d", fin.read(8))
+                time += timeoffsets[fid]
+
+                if fid < self.nfiles - 1:
+                    if time >= self.starttimes[fid + 1] + timeoffsets[fid + 1]:
+                        break
+
+                blocktimes[count] = time
+                useblock[count] = True
+
+                backiter = count - 1
+                while backiter >= 0:
+                    if time <= blocktimes[backiter]:
+                        useblock[backiter] = False
+                        backiter -= 1
+                    else:
+                        break
+
+                count += 1
+                fin.seek(int(self.npart * (self.nvalues - 1) * 4 + 4), 1)
+                dum1 = fin.read(4)
+
+            count = 0
+            for iblock in range(blockcount):
+                if useblock[iblock]:
+                    fin.seek(int(datastart + blocksize * iblock))
+
+                    block = fin.read(int(blocksize))
+                    block = (
+                        block[:4] + struct.pack("d", blocktimes[iblock]) + block[12:]
+                    )
+
+                    if len(block) != blocksize:
+                        print(
+                            "Fail: len(block)={0}, blocksize={1}.".format(
+                                len(block), blocksize
+                            )
+                        )
+                        fin.close()
+                        fout.close()
+                        raise ValueError()
+
+                    fout.write(block)
+
+            fin.close()
+
+        fout.close()
+        return outname
+
 
 class LeafsTracerUtil(object):
     """Utility class for leafs_tracer
