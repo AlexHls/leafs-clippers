@@ -60,7 +60,11 @@ def main(model, outfile, snappath="./", chunksize=2.5, verbose=False):
                 print("Now reading timestep %d/%d" % (itstp, ntimesteps))
 
             chunk, _ = fin.get_timestep(
-                itstp, read_count=read_count, chunksize=read_chunk, quiet=(not verbose)
+                itstp,
+                read_count=read_count,
+                usefile=0,
+                chunksize=read_chunk,
+                quiet=(not verbose),
             )
             for ival in range(6):
                 data[:, itstp, ival] = chunk[ival, :]
