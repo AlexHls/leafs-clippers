@@ -1,3 +1,4 @@
+import os
 import gc
 import time
 import struct
@@ -16,7 +17,11 @@ def main(model, outfile, snappath="./", chunksize=2.5, verbose=False):
     # If not, merge into one file and transpose that file
     if fin.nfiles > 1:
         print("Multiple tracer files detected, merging them into one file...")
-        mergedfile = fin.mergefiles()
+        if os.path.exists(os.path.join(snappath, "%s_merged000.trace" % model)):
+            print("Merged file already exists, loading existing one...")
+            mergedfile = "%s_merged000.trace" % model
+        else:
+            mergedfile = fin.mergefiles()
         fin = leafs_tracer.LeafsTracer(model, snappath=snappath, file=mergedfile)
 
     fout = open(outfile, "wb")
@@ -51,11 +56,11 @@ def main(model, outfile, snappath="./", chunksize=2.5, verbose=False):
         print("Reading chunk size %d starting from %d" % (read_chunk, read_count))
 
         for itstp in range(ntimesteps):
-            if itstp % 10000 == 0:
+            if itstp % 1000 == 0:
                 print("Now reading timestep %d/%d" % (itstp, ntimesteps))
 
             chunk, _ = fin.get_timestep(
-                itstp, read_count=read_count, chunksize=read_chunk, quiet=True
+                itstp, read_count=read_count, chunksize=read_chunk, quiet=verbose
             )
             for ival in range(6):
                 data[:, itstp, ival] = chunk[ival, :]
