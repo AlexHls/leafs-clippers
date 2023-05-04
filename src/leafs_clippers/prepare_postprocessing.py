@@ -22,6 +22,7 @@ def prepare_yann_tracerinitialcomposition(
     data = leafs_tracer.LeafsTracer(model, snappath=snappath)
     ini = leafs_tracer.LeafsTracerUtil(data.initial())
     XC = ini.X[0, :]
+    XN = np.zeros_like(XC)
     XO = ini.X[1, :]
     if len(ini.X) == 6:
         if simulation_type == "ONeDef":
@@ -48,16 +49,30 @@ def prepare_yann_tracerinitialcomposition(
     if simulation_type == "ONeDef":
         f.write(struct.pack("{:d}d".format(ntrace), *XHe.astype(np.float64)))
         f.write(struct.pack("{:d}d".format(ntrace), *XC.astype(np.float64)))
-        f.write(
-            struct.pack("{:d}d".format(ntrace), *np.zeros_like(XC).astype(np.float64))
-        )  # N14
+        f.write(struct.pack("{:d}d".format(ntrace), *XN.astype(np.float64)))  # N14
         f.write(struct.pack("{:d}d".format(ntrace), *XO.astype(np.float64)))
         f.write(struct.pack("{:d}d".format(ntrace), *XNe.astype(np.float64)))
+        f.write(
+            struct.pack("{:d}d".format(ntrace), *np.zeros_like(XC).astype(np.float64))
+        )  # Ne22
     else:
         f.write(struct.pack("{:d}d".format(ntrace), *XHe.astype(np.float64)))
         f.write(struct.pack("{:d}d".format(ntrace), *XC.astype(np.float64)))
         f.write(struct.pack("{:d}d".format(ntrace), *XO.astype(np.float64)))
+        f.write(struct.pack("{:d}d".format(ntrace), *XNe.astype(np.float64)))  # Ne20
+        f.write(
+            struct.pack("{:d}d".format(ntrace), *np.zeros_like(XC).astype(np.float64))
+        )  # Ne22
     f.close()
+
+    norm = XHe + XC + XO + XNe
+    print("Exported the following initial abundances:")
+    print("He4 = %g" % (np.sum(XHe / norm) / ntrace))
+    print("C12 = %g" % (np.sum(XC / norm) / ntrace))
+    print("N14 = %g" % (np.sum(XN / norm) / ntrace))
+    print("O16 = %g" % (np.sum(XO / norm) / ntrace))
+    print("Ne20 = %g" % (np.sum(XNe / norm) / ntrace))
+    print("Ne22 = %g" % (np.sum(np.zeros_like(XC) / norm) / ntrace))
 
     return True
 

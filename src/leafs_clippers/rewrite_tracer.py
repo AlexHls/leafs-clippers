@@ -40,7 +40,7 @@ def main(model, outfile, snappath="./", chunksize=2.5, verbose=False):
 
     fout.write(struct.pack("iiiii", ntracer, 1, ntracer, ntimesteps, 6))
     masses.tofile(fout)
-    times.tofile(fout)
+    np.array(times, dtype="f4").tofile(fout)
 
     # Set buffer size
     read_chunk = int((chunksize * 8e9) // (6 * ntimesteps * 10 * 8))
