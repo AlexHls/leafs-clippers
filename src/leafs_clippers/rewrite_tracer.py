@@ -10,7 +10,7 @@ from leafs_clippers.util.const import M_SOL
 from leafs_clippers import leafs_tracer
 
 
-def main(model, outfile, snappath="./", chunksize=2.5, verbose=False):
+def main(model, outfile, snappath="./", chunksize=2.5, verbose=False, max_tracers=-1):
     fin = leafs_tracer.LeafsTracer(model, snappath=snappath)
 
     # Check if file is in one single file
@@ -48,6 +48,9 @@ def main(model, outfile, snappath="./", chunksize=2.5, verbose=False):
     print("Reading ", read_chunk, " tracers per chunk.")
 
     read_count = 0
+    tracer_num = 0
+    if max_tracers > 0:
+        write_out_tracers = np.random.choice(ntracer, size=max_tracers, replace=False)
     while read_count < ntracer:
         read_chunk = min(read_chunk, ntracer - read_count)
 
@@ -80,7 +83,11 @@ def main(model, outfile, snappath="./", chunksize=2.5, verbose=False):
                         data[itracer, :, 3].max(),
                     )
                 )
-            data[itracer, :, :].T.tofile(fout)
+            if max_tracers > 0 and tracer_num in write_out_tracers:
+                data[itracer, :, :].T.tofile(fout)
+            elif max_tracers < 0:
+                data[itracer, :, :].T.tofile(fout)
+            tracer_num += 1
 
         print(
             "Writing done, reading and writing of chunk took %ds."
@@ -93,6 +100,14 @@ def main(model, outfile, snappath="./", chunksize=2.5, verbose=False):
         gc.collect()
 
     fout.close()
+
+    if max_tracers > 0:
+        np.savetxt(
+            outfile + ".tracers",
+            write_out_tracers,
+            fmt="%d",
+            header="Tracers written out: %d" % max_tracers,
+        )
 
     return
 
@@ -121,6 +136,13 @@ def cli():
         type=float,
         default=2.5,
     )
+    parser.add_argument(
+        "-m",
+        "--max_tracers",
+        help="Maximum number of tracers to be transposed",
+        type=int,
+        default=-1,
+    )
     parser.add_argument("--verbose", help="Enables verbose output", action="store_true")
 
     args = parser.parse_args()
@@ -131,6 +153,7 @@ def cli():
         snappath=args.snappath,
         chunksize=args.chunksize,
         verbose=args.verbose,
+        max_tracers=args.max_tracers,
     )
     return
 

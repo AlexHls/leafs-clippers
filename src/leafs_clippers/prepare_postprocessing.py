@@ -13,6 +13,7 @@ def prepare_yann_tracerinitialcomposition(
     outname="tracerinitialcomposition.dat",
     overwrite=False,
     simulation_type="ONeDef",
+    tracer_number_file="tracer_serial.dat.tracers",
 ):
     assert simulation_type in [
         "CODef",
@@ -34,6 +35,14 @@ def prepare_yann_tracerinitialcomposition(
     else:
         XHe = np.zeros_like(XC)
         XNe = np.zeros_like(XC)
+
+    if tracer_number_file is not None:
+        tracer_numbers = np.loadtxt(tracer_number_file, dtype=int, skiprows=1)
+        XC = XC[tracer_numbers]
+        XN = XN[tracer_numbers]
+        XO = XO[tracer_numbers]
+        XHe = XHe[tracer_numbers]
+        XNe = XNe[tracer_numbers]
 
     ntrace = XC.shape[0]
 
@@ -85,6 +94,7 @@ def main(args):
             outname=args.outname,
             overwrite=args.overwrite,
             simulation_type=args.simulation_type,
+            tracer_number_file=args.tracer_number_file,
         )
     else:
         raise ValueError("Network not implemented")
@@ -129,6 +139,11 @@ def cli():
         help="Which type of simulation to process",
         choices=["ONeDef", "CODef", "HeDet"],
         default="ONeDef",
+    )
+    parser.add_argument(
+        "--tracer_number_file",
+        help="Name of the file containing the tracer numbers",
+        default="tracer_serial.dat.tracers",
     )
 
     args = parser.parse_args()
