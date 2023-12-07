@@ -38,8 +38,13 @@ def main(model, outfile, snappath="./", chunksize=2.5, verbose=False, max_tracer
     print("Getting timesteps took %ds" % (time.time() - start))
     print("Found %d tracers with %d timesteps" % (ntracer, ntimesteps))
 
-    fout.write(struct.pack("iiiii", ntracer, 1, ntracer, ntimesteps, 6))
-    masses.tofile(fout)
+    if max_tracers > 0:
+        write_out_tracers = np.random.choice(ntracer, size=max_tracers, replace=False)
+        fout.write(struct.pack("iiiii", max_tracers, 1, max_tracers, ntimesteps, 6))
+        masses[write_out_tracers].tofile(fout)
+    else:
+        fout.write(struct.pack("iiiii", ntracer, 1, ntracer, ntimesteps, 6))
+        masses.tofile(fout)
     np.array(times, dtype="f4").tofile(fout)
 
     # Set buffer size
@@ -49,8 +54,6 @@ def main(model, outfile, snappath="./", chunksize=2.5, verbose=False, max_tracer
 
     read_count = 0
     tracer_num = 0
-    if max_tracers > 0:
-        write_out_tracers = np.random.choice(ntracer, size=max_tracers, replace=False)
     while read_count < ntracer:
         read_chunk = min(read_chunk, ntracer - read_count)
 
