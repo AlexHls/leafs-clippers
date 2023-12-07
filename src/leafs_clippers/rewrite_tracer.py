@@ -53,7 +53,6 @@ def main(model, outfile, snappath="./", chunksize=2.5, verbose=False, max_tracer
     print("Reading ", read_chunk, " tracers per chunk.")
 
     read_count = 0
-    tracer_num = 0
     while read_count < ntracer:
         read_chunk = min(read_chunk, ntracer - read_count)
 
@@ -77,6 +76,12 @@ def main(model, outfile, snappath="./", chunksize=2.5, verbose=False, max_tracer
 
         print("Writing chunk size %d starting from %d." % (read_chunk, read_count))
         for itracer in range(read_chunk):
+            if max_tracers > 0 and (itracer + read_count) in write_out_tracers:
+                data[itracer, :, :].T.tofile(fout)
+            elif max_tracers < 0:
+                data[itracer, :, :].T.tofile(fout)
+            else:
+                continue
             if verbose:
                 print(
                     "Tracer %6d: rho= %g - %g"
@@ -86,11 +91,6 @@ def main(model, outfile, snappath="./", chunksize=2.5, verbose=False, max_tracer
                         data[itracer, :, 3].max(),
                     )
                 )
-            if max_tracers > 0 and tracer_num in write_out_tracers:
-                data[itracer, :, :].T.tofile(fout)
-            elif max_tracers < 0:
-                data[itracer, :, :].T.tofile(fout)
-            tracer_num += 1
 
         print(
             "Writing done, reading and writing of chunk took %ds."
