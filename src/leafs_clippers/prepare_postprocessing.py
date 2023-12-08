@@ -143,7 +143,6 @@ def cli():
     parser.add_argument(
         "--tracer_number_file",
         help="Name of the file containing the tracer numbers",
-        default="tracer_serial.dat.tracers",
     )
 
     args = parser.parse_args()
