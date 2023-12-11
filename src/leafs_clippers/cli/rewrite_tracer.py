@@ -7,7 +7,7 @@ import argparse
 import numpy as np
 
 from leafs_clippers.util.const import M_SOL
-from leafs_clippers import leafs_tracer
+from leafs_clippers.leafs import leafs_tracer
 
 
 def main(model, outfile, snappath="./", chunksize=2.5, verbose=False, max_tracers=-1):

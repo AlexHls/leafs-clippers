@@ -4,7 +4,7 @@ import argparse
 
 import numpy as np
 
-from leafs_clippers import leafs_tracer
+from leafs_clippers.leafs import leafs_tracer
 
 
 def prepare_yann_tracerinitialcomposition(
