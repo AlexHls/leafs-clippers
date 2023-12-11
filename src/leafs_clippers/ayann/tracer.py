@@ -23,7 +23,7 @@ class Tracer:
         with open(tracer_path, "rb") as f:
             ntracer, nspecies = struct.unpack("ii", f.read(8))
 
-            masses = np.fromfile(f, dtype="f8", count=nspecies)
+            masses = np.fromfile(f, dtype="f8", count=ntracer)
             xnuc = np.fromfile(f, dtype="f8", count=nspecies * ntracer).reshape(
                 ntracer, nspecies
             )
