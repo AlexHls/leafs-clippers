@@ -74,7 +74,7 @@ def plot_bubbles(x, y, z, r_bub, outname, wd_rad=None, plot_type="plotly"):
             ),
         )
 
-        fig.show()
+        fig.write_html(outname + ".html")
 
     return
 
