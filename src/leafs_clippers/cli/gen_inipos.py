@@ -1,8 +1,13 @@
 import argparse
+from sys import is_finalizing
 
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from scipy.io import FortranFile
+from plotly import graph_objects as go
+
+matplotlib.use("Agg")
 
 
 def sphere(r, c):
@@ -15,35 +20,62 @@ def sphere(r, c):
     return x, y, z
 
 
-def plot_bubbles(x, y, z, r_bub, outname, wd_rad=None):
-    fig = plt.figure()
-    ax = fig.add_subplot(projection="3d")
+def plot_bubbles(x, y, z, r_bub, outname, wd_rad=None, plot_type="plotly"):
+    if plot_type == "matplotlib":
+        fig = plt.figure()
+        ax = fig.add_subplot(projection="3d")
 
-    for i in range(len(x)):
-        xs, ys, zs = sphere(r_bub / 1e5, [x[i] / 1e5, y[i] / 1e5, z[i] / 1e5])
-        if i == 0:
-            ax.plot_surface(xs, ys, zs, color="tab:red", alpha=0.75)
-        else:
-            ax.plot_surface(xs, ys, zs, color="tab:red", alpha=0.75)
+        for i in range(len(x)):
+            xs, ys, zs = sphere(r_bub / 1e5, [x[i] / 1e5, y[i] / 1e5, z[i] / 1e5])
+            if i == 0:
+                ax.plot_surface(xs, ys, zs, color="tab:red", alpha=0.75)
+            else:
+                ax.plot_surface(xs, ys, zs, color="tab:red", alpha=0.75)
 
-    if wd_rad is not None:
-        xs, ys, zs = sphere(wd_rad / 1e5, [0.0, 0.0, 0.0])
-        ax.plot_surface(xs, ys, zs, color="tab:grey", alpha=0.1)
+        if wd_rad is not None:
+            xs, ys, zs = sphere(wd_rad / 1e5, [0.0, 0.0, 0.0])
+            ax.plot_surface(xs, ys, zs, color="tab:grey", alpha=0.1)
 
-    # Set an equal aspect ratio
-    ax.set_aspect("equal")
-    # Set labels
-    ax.set(
-        xlabel="X (km)",
-        ylabel="Y (km)",
-        zlabel="Z (km)",
-    )
+        # Set an equal aspect ratio
+        ax.set_aspect("equal")
+        # Set labels
+        ax.set(
+            xlabel="X (km)",
+            ylabel="Y (km)",
+            zlabel="Z (km)",
+        )
 
-    plt.savefig(
-        outname + ".png",
-        # bbox_inches="tight",
-        dpi=300,
-    )
+        plt.savefig(
+            outname + ".png",
+            # bbox_inches="tight",
+            dpi=300,
+        )
+    elif plot_type == "plotly":
+        data = []
+        for i in range(len(x)):
+            xs, ys, zs = sphere(r_bub / 1e5, [x[i] / 1e5, y[i] / 1e5, z[i] / 1e5])
+            trace = go.Surface(x=xs, y=ys, z=zs, opacity=0.65)
+            trace["surfacecolor"] = np.ones_like(xs)
+            data.append(trace)
+
+        if wd_rad is not None:
+            xs, ys, zs = sphere(wd_rad / 1e5, [0.0, 0.0, 0.0])
+            trace = go.Surface(x=xs, y=ys, z=zs, opacity=0.25, colorscale="Blues")
+            trace["surfacecolor"] = np.ones_like(xs)
+            data.append(trace)
+
+        fig = go.Figure(data=data)
+
+        fig.update_layout(
+            scene=dict(
+                xaxis_title="X (km)",
+                yaxis_title="Y (km)",
+                zaxis_title="Z (km)",
+            ),
+        )
+
+        fig.show()
+
     return
 
 
@@ -92,6 +124,7 @@ def main(
     distribution_type="uniform",
     create_plot=False,
     wd_rad=None,
+    plot_type="plotly",
 ):
     print("Generating ignition bubbles...")
     if distribution_type == "uniform":
@@ -103,7 +136,7 @@ def main(
 
     if create_plot:
         print("Plotting bubbles...")
-        plot_bubbles(x, y, z, r_bub, outname, wd_rad=wd_rad)
+        plot_bubbles(x, y, z, r_bub, outname, wd_rad=wd_rad, plot_type=plot_type)
 
     print("Writing inipos files...")
 
@@ -172,6 +205,12 @@ def cli():
         help="WD radius. Is used to overplot WD in bubble plot",
         type=float,
     )
+    parser.add_argument(
+        "--plot_type",
+        help="Type of plot to create",
+        choices=["matplotlib", "plotly"],
+        default="plotly",
+    )
 
     args = parser.parse_args()
 
@@ -184,6 +223,7 @@ def cli():
         args.distribution_type,
         args.create_plot,
         args.wd_rad,
+        args.plot_type,
     )
     return
 
