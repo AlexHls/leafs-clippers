@@ -132,6 +132,13 @@ def main(
 
     fout.close()
 
+    if len(tracer_number) > 0:
+        np.savetxt(
+            outfile + ".tracers",
+            tracer_number,
+            fmt="%d",
+            header="Tracers written out: %d" % len(tracer_number),
+        )
     if max_tracers > 0:
         np.savetxt(
             outfile + ".tracers",
