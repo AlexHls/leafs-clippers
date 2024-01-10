@@ -122,6 +122,14 @@ def main(
         del data
         gc.collect()
 
+        if len(tracer_number) > 0:
+            if np.max(tracer_number) < read_count:
+                break
+
+        if max_tracers > 0:
+            if np.max(write_out_tracers) < read_count:
+                break
+
     fout.close()
 
     if max_tracers > 0:
