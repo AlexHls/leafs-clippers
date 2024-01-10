@@ -46,6 +46,13 @@ def main(
     print("Getting timesteps took %ds" % (time.time() - start))
     print("Found %d tracers with %d timesteps" % (ntracer, ntimesteps))
 
+    if len(tracer_number) > 0:
+        fout.write(
+            struct.pack(
+                "iiiii", len(tracer_number), 1, len(tracer_number), ntimesteps, 6
+            )
+        )
+        masses[tracer_number].tofile(fout)
     if max_tracers > 0:
         write_out_tracers = np.random.choice(ntracer, size=max_tracers, replace=False)
         fout.write(struct.pack("iiiii", max_tracers, 1, max_tracers, ntimesteps, 6))
