@@ -64,6 +64,20 @@ def plot_bubbles(x, y, z, r_bub, outname, wd_rad=None, plot_type="plotly"):
             trace["surfacecolor"] = np.ones_like(xs)
             data.append(trace)
 
+        # Add scatter for the center of the wd_rad
+        trace = go.Scatter3d(
+            x=[0.0],
+            y=[0.0],
+            z=[0.0],
+            mode="markers",
+            marker=dict(
+                size=25,
+                color="black",
+                symbol="cross",
+            ),
+        )
+        data.append(trace)
+
         fig = go.Figure(data=data)
 
         fig.update_layout(
@@ -128,7 +142,12 @@ def main(
 ):
     print("Generating ignition bubbles...")
     if distribution_type == "uniform":
-        x, y, z = create_uniform_bubbles(n_bub, r_cen, r_sphere)
+        if n_bub == 1:
+            x = np.array([r_cen])
+            y = np.array([0.0])
+            z = np.array([0.0])
+        else:
+            x, y, z = create_uniform_bubbles(n_bub, r_cen, r_sphere)
     elif distribution_type == "gaussian":
         x, y, z = create_gaussian_bubbles(n_bub, r_cen, r_sphere)
     else:

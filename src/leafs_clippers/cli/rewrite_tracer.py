@@ -10,7 +10,15 @@ from leafs_clippers.util.const import M_SOL
 from leafs_clippers.leafs import leafs_tracer
 
 
-def main(model, outfile, snappath="./", chunksize=2.5, verbose=False, max_tracers=-1):
+def main(
+    model,
+    outfile,
+    snappath="./",
+    chunksize=2.5,
+    verbose=False,
+    max_tracers=-1,
+    tracer_number=[],
+):
     fin = leafs_tracer.LeafsTracer(model, snappath=snappath)
 
     # Check if file is in one single file
@@ -76,7 +84,12 @@ def main(model, outfile, snappath="./", chunksize=2.5, verbose=False, max_tracer
 
         print("Writing chunk size %d starting from %d." % (read_chunk, read_count))
         for itracer in range(read_chunk):
-            if max_tracers > 0 and (itracer + read_count) in write_out_tracers:
+            if len(tracer_number) > 0:
+                if itracer + read_count not in tracer_number:
+                    continue
+                else:
+                    data[itracer, :, :].T.tofile(fout)
+            elif max_tracers > 0 and (itracer + read_count) in write_out_tracers:
                 data[itracer, :, :].T.tofile(fout)
             elif max_tracers < 0:
                 data[itracer, :, :].T.tofile(fout)
@@ -146,6 +159,13 @@ def cli():
         type=int,
         default=-1,
     )
+    parser.add_argument(
+        "--tracer_number",
+        help="Specific tracers to be transposed",
+        type=int,
+        nargs="+",
+        default=[],
+    )
     parser.add_argument("--verbose", help="Enables verbose output", action="store_true")
 
     args = parser.parse_args()
@@ -157,6 +177,7 @@ def cli():
         chunksize=args.chunksize,
         verbose=args.verbose,
         max_tracers=args.max_tracers,
+        tracer_number=args.tracer_number,
     )
     return
 
