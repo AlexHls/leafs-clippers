@@ -18,6 +18,7 @@ def main(
     verbose=False,
     max_tracers=-1,
     tracer_number=[],
+    tracer_range=[],
 ):
     fin = leafs_tracer.LeafsTracer(model, snappath=snappath)
 
@@ -45,6 +46,14 @@ def main(
     ntimesteps = len(times)
     print("Getting timesteps took %ds" % (time.time() - start))
     print("Found %d tracers with %d timesteps" % (ntracer, ntimesteps))
+
+    if len(tracer_range) > 0:
+        if len(tracer_number) > 0:
+            tracer_number.extend(np.arange(tracer_range[0], tracer_range[1]))
+            tracer_number = np.unique(tracer_number)
+            tracer_number = np.sort(tracer_number)
+        else:
+            tracer_number = np.arange(tracer_range[0], tracer_range[1])
 
     if len(tracer_number) > 0:
         fout.write(
@@ -188,6 +197,13 @@ def cli():
         nargs="+",
         default=[],
     )
+    parser.add_argument(
+        "--tracer_range",
+        help="Range of tracers to be transposed",
+        type=int,
+        nargs=2,
+        default=[],
+    )
     parser.add_argument("--verbose", help="Enables verbose output", action="store_true")
 
     args = parser.parse_args()
@@ -200,6 +216,7 @@ def cli():
         verbose=args.verbose,
         max_tracers=args.max_tracers,
         tracer_number=args.tracer_number,
+        tracer_range=args.tracer_range,
     )
     return
 
