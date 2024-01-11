@@ -62,7 +62,7 @@ def main(
             )
         )
         masses[tracer_number].tofile(fout)
-    if max_tracers > 0:
+    elif max_tracers > 0:
         write_out_tracers = np.random.choice(ntracer, size=max_tracers, replace=False)
         fout.write(struct.pack("iiiii", max_tracers, 1, max_tracers, ntimesteps, 6))
         masses[write_out_tracers].tofile(fout)
