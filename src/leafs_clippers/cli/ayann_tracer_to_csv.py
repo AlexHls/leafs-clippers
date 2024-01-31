@@ -4,11 +4,17 @@ from leafs_clippers.ayann.tracer import Tracer
 
 
 def main(
-    tracer_path: str, species_path: str = "data/species.txt", no_csv: bool = False
+    tracer_path: str,
+    species_path: str = "data/species.txt",
+    no_csv: bool = False,
+    relative: bool = False,
 ) -> None:
     tracer = Tracer(tracer_path=tracer_path, species_path=species_path)
 
-    abundances = tracer.abundances
+    if relative:
+        abundances = tracer.relative_abundances
+    else:
+        abundances = tracer.abundances
     abundances.sort_values("Xnuc", ascending=False, inplace=True)
     print(abundances)
 
@@ -35,12 +41,19 @@ def cli() -> None:
         action="store_true",
         help="Do not save abundances to csv.",
     )
+    parser.add_argument(
+        "-r",
+        "--relative",
+        action="store_true",
+        help="Print relative abundances.",
+    )
 
     args = parser.parse_args()
     main(
         tracer_path=args.tracer_path,
         species_path=args.species_path,
         no_csv=args.no_csv,
+        relative=args.relative,
     )
 
 

@@ -41,3 +41,15 @@ class Tracer:
         x_all = (self.xnuc.T * self.masses).sum(axis=1) / const.M_SOL
         abundances["Xnuc"] = x_all
         return abundances
+
+    @property
+    def relative_abundances(self) -> pd.DataFrame:
+        """Return relative abundances.
+
+        Returns:
+            np.ndarray: relative abundances
+        """
+        relative_abundances = self.species.copy()
+        x_all = (self.xnuc.T * self.masses).sum(axis=1) / const.M_SOL
+        relative_abundances["Xnuc"] = x_all / x_all.sum()
+        return relative_abundances
