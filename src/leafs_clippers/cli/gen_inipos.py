@@ -1,5 +1,4 @@
 import argparse
-from sys import is_finalizing
 
 import numpy as np
 import matplotlib
