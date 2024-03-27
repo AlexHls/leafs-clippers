@@ -19,10 +19,11 @@ def get_snaplist(model, snappath="./"):
     return sorted(snaplist)
 
 
-def readsnap(ind, model, snappath="./", simulation_type="ONeDef"):
+def readsnap(ind, model, snappath="./", simulation_type="ONeDef", queit=False):
     return LeafsSnapshot(
         os.path.join(snappath, "{:s}o{:03d}".format(model, int(ind))),
         simulation_type=simulation_type,
+        quiet=queit,
     )
 
 
