@@ -259,3 +259,18 @@ class LeafsSnapshot:
             return self.data[__name]
         else:
             raise AttributeError("{} has no attribute '{}'.".format(type(self), __name))
+
+    def get_density_in_radius(self, center, radius):
+        """return the density in a sphere of radius around center"""
+        assert len(center) == 3, "Center must be a 3D point"
+        assert isinstance(radius, (int, float)), "Radius must be a number"
+        x = self.geomx
+        y = self.geomy
+        z = self.geomz
+        xpos, ypos, zpos = np.meshgrid(x, y, z, indexing="ij")
+        # Not sure about the indexing, i.e. C vs Fortran.
+        # Shouldn't matter for spherical density
+        rad = np.sqrt(
+            (xpos - center[0]) ** 2 + (ypos - center[1]) ** 2 + (zpos - center[2]) ** 2
+        )
+        return self.density[rad < radius]
