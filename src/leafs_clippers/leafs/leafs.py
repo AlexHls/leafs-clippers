@@ -23,7 +23,7 @@ def readsnap(ind, model, snappath="./", simulation_type="ONeDef", quiet=False):
     return LeafsSnapshot(
         os.path.join(snappath, "{:s}o{:03d}".format(model, int(ind))),
         simulation_type=simulation_type,
-        quiet=queit,
+        quiet=quiet,
     )
 
 
