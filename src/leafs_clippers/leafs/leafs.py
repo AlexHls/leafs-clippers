@@ -27,7 +27,7 @@ def readsnap(ind, model, snappath="./", simulation_type="ONeDef"):
 
 
 class LeafsSnapshot:
-    def __init__(self, filename, simulation_type="ONeDef"):
+    def __init__(self, filename, simulation_type="ONeDef", quiet=False):
         self.data = {}
         assert simulation_type in [
             "CODef",
@@ -45,7 +45,8 @@ class LeafsSnapshot:
                 files += [filename + ".%03d" % filecount]
                 filecount += 1
         else:
-            print("Neither %s nor %s.000 exists." % (filename, filename))
+            if not quiet:
+                print("Neither %s nor %s.000 exists." % (filename, filename))
             return
 
         count = 0
@@ -53,7 +54,8 @@ class LeafsSnapshot:
         while fileid < filecount:
             if filecount > 1:
                 count = count + 1
-                print("Reading file %d of %d." % (count, filecount))
+                if not quiet:
+                    print("Reading file %d of %d." % (count, filecount))
 
             f = open(files[fileid], "rb")
 
@@ -95,17 +97,19 @@ class LeafsSnapshot:
                     f.seek(4, os.SEEK_CUR)
 
                     if filecount > num_files:
-                        print(
-                            "Found %d files, but need only %d files."
-                            % (filecount, num_files)
-                        )
+                        if not quiet:
+                            print(
+                                "Found %d files, but need only %d files."
+                                % (filecount, num_files)
+                            )
                         filecount = num_files
 
                     if filecount < num_files:
-                        print(
-                            "Need %d files, but found only %d files, stopping."
-                            % (num_files, filecount)
-                        )
+                        if not quiet:
+                            print(
+                                "Need %d files, but found only %d files, stopping."
+                                % (num_files, filecount)
+                            )
                         f.close()
                         return
 
@@ -162,7 +166,7 @@ class LeafsSnapshot:
             fileid += 1
 
         # compute edges for uniform grid if not present
-        if not "edgex" in self.data:
+        if "edgex" not in self.data:
             deltax = np.diff(self.data["geomx"])
             if np.std(deltax) / np.mean(deltax) < 1e-3:
                 # almost uniform
@@ -170,7 +174,7 @@ class LeafsSnapshot:
                 self.data["edgex"] = np.zeros(len(self.data["geomx"]) + 1)
                 self.data["edgex"][0] = self.data["geomx"][0] - deltax / 2.0
                 self.data["edgex"][1:] = self.data["geomx"] + deltax / 2.0
-        if not "edgey" in self.data:
+        if "edgey" not in self.data:
             deltay = np.diff(self.data["geomy"])
             if np.std(deltay) / np.mean(deltay) < 1e-3:
                 # almost uniform
@@ -178,7 +182,7 @@ class LeafsSnapshot:
                 self.data["edgey"] = np.zeros(len(self.data["geomy"]) + 1)
                 self.data["edgey"][0] = self.data["geomy"][0] - deltay / 2.0
                 self.data["edgey"][1:] = self.data["geomy"] + deltay / 2.0
-        if not "edgez" in self.data:
+        if "edgez" not in self.data:
             deltaz = np.diff(self.data["geomz"])
             if np.std(deltaz) / np.mean(deltaz) < 1e-3:
                 # almost uniform
