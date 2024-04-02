@@ -46,8 +46,9 @@ class LeafsSnapshot:
                 files += [filename + ".%03d" % filecount]
                 filecount += 1
         else:
-            if not quiet:
-                print("Neither %s nor %s.000 exists." % (filename, filename))
+            raise FileNotFoundError(
+                "Neither %s nor %s.000 exists." % (filename, filename)
+            )
             return
 
         count = 0
