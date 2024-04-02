@@ -280,3 +280,34 @@ class LeafsSnapshot:
             (xpos - center[0]) ** 2 + (ypos - center[1]) ** 2 + (zpos - center[2]) ** 2
         )
         return self.density[rad < radius]
+
+    def get_bound_material(self, include_internal_energy=False):
+        """
+        Returns a boolean mask for the bound material.
+        If include_internal_energy is True, the internal energy
+        is included in the bound criterion.
+
+        Bound material is defined as material with a negative
+        total energy:
+            E_kin + E_grav + E_int < 0
+        """
+
+        total_energy = self.egrav + self.ekin
+        if include_internal_energy:
+            total_energy += self.eintkin
+
+        return total_energy < 0
+
+    def get_bound_mass(self, include_internal_energy=False):
+        """
+        Returns the mass of the bound material.
+        If include_internal_energy is True, the internal energy
+        is included in the bound criterion.
+
+        Bound material is defined as material with a negative
+        total energy:
+            E_kin + E_grav + E_int < 0
+        """
+
+        bound_mask = self.get_bound_material(include_internal_energy)
+        return np.sum(self.density[bound_mask] * self.vol[bound_mask])
