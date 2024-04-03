@@ -42,7 +42,7 @@ def main(
         outfile = f"{model}o{snap:03d}.hdf5"
         s.convert_to_hdf5(os.path.join(directory, outfile), overwrite=overwrite)
         if replace:
-            remove_snap(s, snap, model, directory)
+            remove_snap(s, snap, model, directory, no_confirm=no_confirm)
 
         print(f"Converted snapshot {snap} to {outfile}")
 
