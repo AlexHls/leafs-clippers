@@ -40,7 +40,7 @@ def main(
             simulation_type=simulation_type,
         )
         outfile = f"{model}o{snap:03d}.hdf5"
-        s.convert_to_hdf5(outfile, overwrite=overwrite)
+        s.convert_to_hdf5(os.path.join(directory, outfile), overwrite=overwrite)
         if replace:
             remove_snap(s, snap, model, directory)
 
