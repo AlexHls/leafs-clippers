@@ -36,7 +36,7 @@ def readsnap(
         )
     else:
         return LeafsSnapshot(
-            os.path.join(snappath, "{:s}o{:03d}".format(model, int(ind))),
+            os.path.join(snappath, "{:s}o{:03d}.hdf5".format(model, int(ind))),
             quiet=quiet,
         )
 
@@ -45,25 +45,29 @@ class LeafsSnapshot:
     def __init__(self, filename, quiet=False):
         self.quiet = quiet
         self.filename = filename
-        f = h5py.File(filename, "r")
+        try:
+            f = h5py.File(filename, "r")
+        except FileNotFoundError:
+            raise FileNotFoundError("File {} not found.".format(filename))
 
         # Read meta data
-        self.time = f.attrs["time"]
-        self.gnx = f.attrs["gnx"]
-        self.gny = f.attrs["gny"]
-        self.gnz = f.attrs["gnz"]
-        self.ncells = f.attrs["ncells"]
-        self.rad_wd = f.attrs["rad_wd"]
-        self.rad_fl = f.attrs["rad_fl"]
-        self.idx_wd = f.attrs["idx_wd"]
-        self.idx_fl = f.attrs["idx_fl"]
-        self.simulation_type = f.attrs["simulation_type"]
+        try:
+            self.time = f.attrs["time"]
+            self.gnx = f.attrs["gnx"]
+            self.gny = f.attrs["gny"]
+            self.gnz = f.attrs["gnz"]
+            self.ncells = f.attrs["ncells"]
+            self.rad_wd = f.attrs["rad_wd"]
+            self.rad_fl = f.attrs["rad_fl"]
+            self.idx_wd = f.attrs["idx_wd"]
+            self.idx_fl = f.attrs["idx_fl"]
+            self.simulation_type = f.attrs["simulation_type"]
 
-        # Create LazyDict
-        self.keys = list(f.keys())
-        self.data = util.LazyDict(filename, self.keys)
-
-        f.close()
+            # Create LazyDict
+            self.keys = list(f.keys())
+            self.data = util.LazyDict(filename, self.keys)
+        finally:
+            f.close()
         return
 
     def __getattr__(self, __name: str):
