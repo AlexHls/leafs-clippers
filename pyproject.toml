@@ -35,6 +35,7 @@ packages = [
 "bin/clipper-prepare-pp" = "src/leafs_clippers/cli/prepare_postprocessing.py"
 "bin/clipper-rewrite-tracer" = "src/leafs_clippers/cli/rewrite_tracer.py"
 "bin/clipper-ayann-tocsv" = "src/leafs_clippers/cli/ayann_tracer_to_csv.py"
+"bin/clipper-convert-tohdf5" = "src/leafs_clippers/cli/convert_leafs_to_hdf5.py"
 
 [tool.hatch.build.targets.wheel.force-include]
 #"bin/clipper-gen-inipos" = "src/leafs_clippers/cli/gen_inipos.py"
@@ -47,3 +48,4 @@ clipper-gen-inipos = "leafs_clippers.cli.gen_inipos:cli"
 clipper-prepare-pp = "leafs_clippers.cli.prepare_postprocessing:cli"
 clipper-rewrite-tracer = "leafs_clippers.cli.rewrite_tracer:cli"
 clipper-ayann-tocsv = "leafs_clippers.cli.ayann_tracer_to_csv:cli"
+clipper-convert-tohdf5 = "leafs_clippers.cli.convert_leafs_to_hdf5:cli"

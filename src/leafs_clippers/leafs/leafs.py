@@ -358,7 +358,7 @@ class LeafsLegacySnapshot(LeafsSnapshot):
         else:
             raise AttributeError("{} has no attribute '{}'.".format(type(self), __name))
 
-    def convert_to_hdf5(self, filename):
+    def convert_to_hdf5(self, filename, overwrite=False):
         """
         Convert the snapshot to an HDF5 file.
         Only works for 3D snapshots.
@@ -392,6 +392,11 @@ class LeafsLegacySnapshot(LeafsSnapshot):
             "idx_fl",
             "simulation_type",
         ]
+
+        if os.path.exists(filename) and not overwrite:
+            raise FileExistsError(
+                "File {} exists. Use overwrite=True to overwrite.".format(filename)
+            )
 
         with h5py.File(filename, "w") as f:
             for i, label in enumerate(meta_label):
