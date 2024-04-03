@@ -1,6 +1,7 @@
 import os
 import re
 import glob
+import struct
 
 import h5py
 import numpy as np
