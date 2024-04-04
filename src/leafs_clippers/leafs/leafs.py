@@ -3,15 +3,21 @@ import re
 import glob
 import struct
 
+import h5py
 import numpy as np
 
+from leafs_clippers.util import utilities as util
 
-def get_snaplist(model, snappath="./"):
+
+def get_snaplist(model, snappath="./", legacy=False):
     # check parallel files first
-    outfiles = glob.glob(model + "o[0-9][0-9][0-9].000", root_dir=snappath)
-    # check output from serial run if nothing was found
-    if len(outfiles) == 0:
-        outfiles = glob.glob(model + "o[0-9][0-9][0-9]", root_dir=snappath)
+    if legacy:
+        outfiles = glob.glob(model + "o[0-9][0-9][0-9].000", root_dir=snappath)
+        # check output from serial run if nothing was found
+        if len(outfiles) == 0:
+            outfiles = glob.glob(model + "o[0-9][0-9][0-9]", root_dir=snappath)
+    else:
+        outfiles = glob.glob(model + "o[0-9][0-9][0-9].hdf5", root_dir=snappath)
     snaplist = []
     for name in outfiles:
         snaplist.append(int(re.sub(model + r"o([0-9]{3}).*", r"\1", name)))
@@ -19,15 +25,106 @@ def get_snaplist(model, snappath="./"):
     return sorted(snaplist)
 
 
-def readsnap(ind, model, snappath="./", simulation_type="ONeDef", quiet=False):
-    return LeafsSnapshot(
-        os.path.join(snappath, "{:s}o{:03d}".format(model, int(ind))),
-        simulation_type=simulation_type,
-        quiet=quiet,
-    )
+def readsnap(
+    ind, model, snappath="./", simulation_type="ONeDef", quiet=False, legacy=False
+):
+    if legacy:
+        return LeafsLegacySnapshot(
+            os.path.join(snappath, "{:s}o{:03d}".format(model, int(ind))),
+            simulation_type=simulation_type,
+            quiet=quiet,
+        )
+    else:
+        return LeafsSnapshot(
+            os.path.join(snappath, "{:s}o{:03d}.hdf5".format(model, int(ind))),
+            quiet=quiet,
+        )
 
 
 class LeafsSnapshot:
+    def __init__(self, filename, quiet=False):
+        self.quiet = quiet
+        self.filename = filename
+        try:
+            f = h5py.File(filename, "r")
+        except FileNotFoundError:
+            raise FileNotFoundError("File {} not found.".format(filename))
+
+        # Read meta data
+        try:
+            self.time = f.attrs["time"]
+            self.gnx = f.attrs["gnx"]
+            self.gny = f.attrs["gny"]
+            self.gnz = f.attrs["gnz"]
+            self.ncells = f.attrs["ncells"]
+            self.rad_wd = f.attrs["rad_wd"]
+            self.rad_fl = f.attrs["rad_fl"]
+            self.idx_wd = f.attrs["idx_wd"]
+            self.idx_fl = f.attrs["idx_fl"]
+            self.simulation_type = f.attrs["simulation_type"]
+
+            # Create LazyDict
+            self.keys = list(f.keys())
+            self.data = util.LazyDict(filename, self.keys)
+        finally:
+            f.close()
+        return
+
+    def __getattr__(self, __name: str):
+        """enable access via object attributes to data dict entries"""
+        if __name in self.data:
+            return self.data[__name]
+        else:
+            raise AttributeError("{} has no attribute '{}'.".format(type(self), __name))
+
+    def get_density_in_radius(self, center, radius):
+        """return the density in a sphere of radius around center"""
+        assert len(center) == 3, "Center must be a 3D point"
+        assert isinstance(radius, (int, float)), "Radius must be a number"
+        x = self.geomx
+        y = self.geomy
+        z = self.geomz
+        xpos, ypos, zpos = np.meshgrid(x, y, z, indexing="ij")
+        # Not sure about the indexing, i.e. C vs Fortran.
+        # Shouldn't matter for spherical density
+        rad = np.sqrt(
+            (xpos - center[0]) ** 2 + (ypos - center[1]) ** 2 + (zpos - center[2]) ** 2
+        )
+        return self.density[rad < radius]
+
+    def get_bound_material(self, include_internal_energy=False):
+        """
+        Returns a boolean mask for the bound material.
+        If include_internal_energy is True, the internal energy
+        is included in the bound criterion.
+
+        Bound material is defined as material with a negative
+        total energy:
+            E_kin + E_grav + E_int < 0
+        """
+
+        total_energy = self.egrav + self.ekin
+        if include_internal_energy:
+            total_energy += self.eintkin
+
+        return total_energy < 0
+
+    def get_bound_mass(self, include_internal_energy=False):
+        """
+        Returns the mass of the bound material.
+        If include_internal_energy is True, the internal energy
+        is included in the bound criterion.
+
+        Bound material is defined as material with a negative
+        total energy:
+            E_kin + E_grav + E_int < 0
+        """
+
+        bound_mask = self.get_bound_material(include_internal_energy)
+        return np.sum(self.density[bound_mask] * self.vol[bound_mask])
+
+
+class LeafsLegacySnapshot(LeafsSnapshot):
     def __init__(self, filename, simulation_type="ONeDef", quiet=False):
         self.data = {}
         assert simulation_type in [
@@ -266,48 +363,54 @@ class LeafsSnapshot:
         else:
             raise AttributeError("{} has no attribute '{}'.".format(type(self), __name))
 
-    def get_density_in_radius(self, center, radius):
-        """return the density in a sphere of radius around center"""
-        assert len(center) == 3, "Center must be a 3D point"
-        assert isinstance(radius, (int, float)), "Radius must be a number"
-        x = self.geomx
-        y = self.geomy
-        z = self.geomz
-        xpos, ypos, zpos = np.meshgrid(x, y, z, indexing="ij")
-        # Not sure about the indexing, i.e. C vs Fortran.
-        # Shouldn't matter for spherical density
-        rad = np.sqrt(
-            (xpos - center[0]) ** 2 + (ypos - center[1]) ** 2 + (zpos - center[2]) ** 2
-        )
-        return self.density[rad < radius]
-
-    def get_bound_material(self, include_internal_energy=False):
+    def convert_to_hdf5(self, filename, overwrite=False):
         """
-        Returns a boolean mask for the bound material.
-        If include_internal_energy is True, the internal energy
-        is included in the bound criterion.
-
-        Bound material is defined as material with a negative
-        total energy:
-            E_kin + E_grav + E_int < 0
+        Convert the snapshot to an HDF5 file.
+        Only works for 3D snapshots.
         """
+        try:
+            import h5py
+        except ImportError:
+            raise ImportError("h5py is required to convert to HDF5")
 
-        total_energy = self.egrav + self.ekin
-        if include_internal_energy:
-            total_energy += self.eintkin
+        meta = [
+            self.time,
+            self.gnx,
+            self.gny,
+            self.gnz,
+            self.ncells,
+            self.rad_wd,
+            self.rad_fl,
+            self.idx_wd,
+            self.idx_fl,
+            self.simulation_type,
+        ]
+        meta_label = [
+            "time",
+            "gnx",
+            "gny",
+            "gnz",
+            "ncells",
+            "rad_wd",
+            "rad_fl",
+            "idx_wd",
+            "idx_fl",
+            "simulation_type",
+        ]
 
-        return total_energy < 0
+        if os.path.exists(filename) and not overwrite:
+            raise FileExistsError(
+                "File {} exists. Use overwrite=True to overwrite.".format(filename)
+            )
 
-    def get_bound_mass(self, include_internal_energy=False):
-        """
-        Returns the mass of the bound material.
-        If include_internal_energy is True, the internal energy
-        is included in the bound criterion.
+        with h5py.File(filename, "w") as f:
+            for i, label in enumerate(meta_label):
+                f.attrs[label] = meta[i]
 
-        Bound material is defined as material with a negative
-        total energy:
-            E_kin + E_grav + E_int < 0
-        """
+            for k in list(self.data.keys()):
+                dset = f.create_dataset(
+                    k, self.data[k].shape, dtype=str(self.data[k].dtype)
+                )
+                dset[...] = self.data[k]
 
-        bound_mask = self.get_bound_material(include_internal_energy)
-        return np.sum(self.density[bound_mask] * self.vol[bound_mask])
+        return
