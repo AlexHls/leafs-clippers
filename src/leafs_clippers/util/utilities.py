@@ -103,3 +103,7 @@ def extrapolate_oda_aux(array):
                 new_array[i * 13 + j] = array[i * 12 + j]
 
     return new_array
+
+
+def get_abar_zbar(xnuc, species):
+    pass

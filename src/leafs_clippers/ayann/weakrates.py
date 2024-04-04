@@ -1,6 +1,7 @@
 from io import StringIO
 
 import numyp as np
+from scipy.interpolate import RectBivariateSpline
 
 from leafs_clippers.util import utilities as util
 
@@ -19,6 +20,7 @@ class AYANNWeakRate:
         self.lambda2 = rate.lambda2
         self.lambda3 = rate.lambda3
         self.temp_len = rate.temp_len
+        self.set_interp()
         assert self.temp_len == len(
             self.temp
         ), "Number of temperatures is not equal to temp_len ({} {}, {}, {})".format(
@@ -39,6 +41,46 @@ class AYANNWeakRate:
 
     def get_input_output(self):
         return self.input, self.output
+
+    def set_interp(self):
+        self.interp = [
+            RectBivariateSpline(
+                self.temp,
+                self.rhoye,
+                x.reshape(self.rhoye.shape[0], self.temp.shape[0]).T,
+                kx=1,
+                ky=1,
+            )
+            for x in (self.lambda1, self.lambda3)
+        ]
+
+    def rate_ye(self, rho, temp, ye, verbose=False):
+        lrhoye = np.log10(rho * ye)
+        t9 = temp * 1e-9
+        if verbose:
+            print("lrhoye:", lrhoye)
+            print("t9:", t9)
+
+        def func(t, lr):
+            return 10 ** self.interp[0](t, lr) + 10 ** self.interp[1](t, lr)
+
+        def func1(t, lr):
+            return self.interp[0](t, lr)
+
+        def func2(t, lr):
+            return self.interp[1](t, lr)
+
+        rate_minus = np.vectorize(func1)(t9, lrhoye)
+        rate_plus = np.vectorize(func2)(t9, lrhoye)
+        rate = np.vectorize(func)(t9, lrhoye)
+        if verbose:
+            print("rate_minus:", rate_minus)
+            print("rate_plus:", rate_plus)
+            print("rate:", rate)
+        if len(rate) == 1:
+            rate = float(rate)
+
+        return rate
 
 
 class AYANNWeakRates:
@@ -108,6 +150,7 @@ class NKKWeakRate(AYANNWeakRate):
         self.temp = tempcol[:12:]
         self.rhoye = rhoyecol[::12]
         self.temp_len = 12
+        self.set_interp()
 
     def extrapolate(self, temp=100):
         # Constant extrapolation
@@ -208,6 +251,7 @@ class ODAWeakRate(AYANNWeakRate):
         self.temp = tempcol[:12:]
         self.rhoye = rhoyecol[::12]
         self.temp_len = 12
+        self.set_interp()
 
     def extrapolate(self, temp=100):
         # Constant extrapolation
@@ -296,6 +340,7 @@ class LMPWeakRate(AYANNWeakRate):
         self.temp = tempcol[:13:]
         self.rhoye = rhoyecol[::13]
         self.temp_len = 13
+        self.set_interp()
 
 
 class LMPWeakRates(AYANNWeakRates):
