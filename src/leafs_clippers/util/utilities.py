@@ -79,3 +79,27 @@ class LazyDict(dict):
             self[key] = np.array(aux[:] if aux is not None else None)
             self._loaded_keys.append(key)
             del aux
+
+
+def extrapolate_nkk_aux(array):
+    new_array = np.zeros(143)
+    for i in range(11):
+        for j in range(13):
+            if j == 12:
+                new_array[i * 13 + j] = array[i * 12 + j - 1]
+            else:
+                new_array[i * 13 + j] = array[i * 12 + j]
+
+    return new_array
+
+
+def extrapolate_oda_aux(array):
+    new_array = np.zeros(143)
+    for i in range(11):
+        for j in range(13):
+            if j == 12:
+                new_array[i * 13 + j] = array[i * 12 + j - 1]
+            else:
+                new_array[i * 13 + j] = array[i * 12 + j]
+
+    return new_array
