@@ -1,6 +1,6 @@
 from io import StringIO
 
-import numyp as np
+import numpy as np
 
 from leafs_clippers.util import utilities as util
 
