@@ -23,6 +23,35 @@ def obj2dict(obj):
     return d
 
 
+def get_abar_zbar(xnuc, species):
+    """
+    Calculate abar and zbar from xnuc and species.
+
+    Parameters
+    ----------
+    xnuc : dict
+        dictionary of xnuc
+    species : pd.DataFrame
+        species dataframe
+    """
+    abar = 0
+    zbar = 0
+    xsum = 0
+    spec_in_xnuc = list(xnuc.keys())
+
+    for i in range(len(xnuc)):
+        name = spec_in_xnuc[i]
+        ymass = xnuc[name] / species[species["Name"] == name]["A"].values[0]
+        abar += ymass
+        zbar += species[species["Name"] == name]["Z"].values[0] * ymass
+        xsum += xnuc[name]
+
+    abar = xsum / abar
+    zbar = zbar / xsum * abar
+
+    return abar, zbar
+
+
 def load_species(species_path: str) -> pd.DataFrame:
     """Load species from species file.
 
