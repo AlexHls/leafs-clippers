@@ -26,13 +26,20 @@ def get_snaplist(model, snappath="./", legacy=False):
 
 
 def readsnap(
-    ind, model, snappath="./", simulation_type="ONeDef", quiet=False, legacy=False
+    ind,
+    model,
+    snappath="./",
+    simulation_type="ONeDef",
+    quiet=False,
+    legacy=False,
+    little_endian=True,
 ):
     if legacy:
         return LeafsLegacySnapshot(
             os.path.join(snappath, "{:s}o{:03d}".format(model, int(ind))),
             simulation_type=simulation_type,
             quiet=quiet,
+            little_endian=little_endian,
         )
     else:
         return LeafsSnapshot(
@@ -123,9 +130,21 @@ class LeafsSnapshot:
         bound_mask = self.get_bound_material(include_internal_energy)
         return np.sum(self.density[bound_mask] * self.vol[bound_mask])
 
+    def get_central_value(self, value):
+        """
+        Returns the central value of a quantity.
+        """
+        assert isinstance(value, str), "Value must be a string"
+        mid = int(self.gnx / 2)
+        return np.mean(
+            self.data[value][mid - 1 : mid + 2, mid - 1 : mid + 2, mid - 1 : mid + 2]
+        )
+
 
 class LeafsLegacySnapshot(LeafsSnapshot):
-    def __init__(self, filename, simulation_type="ONeDef", quiet=False):
+    def __init__(
+        self, filename, simulation_type="ONeDef", quiet=False, little_endian=True
+    ):
         self.data = {}
         assert simulation_type in [
             "CODef",
@@ -133,6 +152,11 @@ class LeafsLegacySnapshot(LeafsSnapshot):
             "HeDet",
         ], "Unrecognized simulation type"
         self.simulation_type = simulation_type
+
+        if little_endian:
+            self.endian = "<"
+        else:
+            self.endian = ">"
 
         filecount = 1
         if os.path.exists(filename):
@@ -160,7 +184,7 @@ class LeafsLegacySnapshot(LeafsSnapshot):
 
             s = f.read(20)
             while len(s) > 0:
-                _, name, length, _ = struct.unpack("<i8sii", s)
+                _, name, length, _ = struct.unpack(f"{self.endian}i8sii", s)
                 name = name.decode("ascii").strip()
 
                 if name == "HEAD":
@@ -178,7 +202,7 @@ class LeafsLegacySnapshot(LeafsSnapshot):
                         rad_fl,
                         idx_wd,
                         idx_fl,
-                    ) = struct.unpack("<fiiiiddii", s)
+                    ) = struct.unpack(f"{self.endian}fiiiiddii", s)
 
                     s = f.read(256 - 48)
 
@@ -244,7 +268,7 @@ class LeafsLegacySnapshot(LeafsSnapshot):
                         f.seek(4, os.SEEK_CUR)
 
                         s = f.read(24)
-                        x0, x1, y0, y1, z0, z1 = struct.unpack("<6i", s)
+                        x0, x1, y0, y1, z0, z1 = struct.unpack(f"{self.endian}6i", s)
                         nx = x1 - x0 + 1
                         ny = y1 - y0 + 1
                         nz = z1 - z0 + 1

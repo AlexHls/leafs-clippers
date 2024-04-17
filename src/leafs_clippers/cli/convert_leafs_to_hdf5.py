@@ -29,6 +29,7 @@ def main(
     replace=False,
     no_confirm=False,
     simulation_type="ONeDef",
+    big_endian=False,
 ):
     snaplist = lc.get_snaplist(model, snappath=directory, legacy=True)
     for snap in snaplist:
@@ -38,6 +39,7 @@ def main(
             snappath=directory,
             legacy=True,
             simulation_type=simulation_type,
+            little_endian=not big_endian,
         )
         outfile = f"{model}o{snap:03d}.hdf5"
         s.convert_to_hdf5(os.path.join(directory, outfile), overwrite=overwrite)
@@ -83,6 +85,11 @@ def cli():
         default="ONeDef",
         help="Simulation type",
     )
+    parser.add_argument(
+        "--big_endian",
+        action="store_true",
+        help="Big endian",
+    )
 
     args = parser.parse_args()
     main(
@@ -92,6 +99,7 @@ def cli():
         replace=args.replace,
         no_confirm=args.no_confirm,
         simulation_type=args.simulation_type,
+        big_endian=args.big_endian,
     )
 
 
