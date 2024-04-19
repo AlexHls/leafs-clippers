@@ -372,6 +372,45 @@ class LeafsTracer:
         fout.close()
         return outname
 
+    def last(self, two_d=False, countfromend=1):
+        """set two_d to avoid getting wrong dictionary entries
+        use countfromend to access timesteps before the last one"""
+
+        f = open(self.files[-1], "rb")
+        f.seek(0, 2)  # seek end of file
+
+        f.seek(
+            -4 - self.npart * (self.nvalues - 1) * 4 - 8, 1
+        )  # go back one dataset from current position
+        for i in range(countfromend - 1):
+            f.seek(
+                -4 - 4 - self.npart * (self.nvalues - 1) * 4 - 8, 1
+            )  # go back one dataset from current position
+
+        (time,) = struct.unpack("<d", f.read(8))
+        print("Time: ", time)
+        data = np.fromfile(
+            f, dtype="float32", count=self.npart * (self.nvalues - 1)
+        ).reshape(self.nvalues - 1, self.npart)
+
+        if self.nvalues == 7 and not two_d:
+            # incorrect for two_d case as pos has only two dimensions then
+            return utilities.dict2obj(
+                {
+                    "pos": data[0:3, :],
+                    "rho": data[3, :],
+                    "temp": data[4, :],
+                    "ene": data[5, :],
+                    "nvalues": self.nvalues,
+                    "time": time,
+                    "data": data,
+                }
+            )
+        else:
+            return utilities.dict2obj(
+                {"data": data, "nvalues": self.nvalues, "time": time}
+            )
+
 
 class LeafsTracerUtil(object):
     """Utility class for leafs_tracer
@@ -566,3 +605,5 @@ class LeafsTracerUtil(object):
                 if not self.threed:
                     self.vz = self.raw_data[ind, :]
                     ind += 1
+
+        self.esc = self.raw_data[ind + 1, :]

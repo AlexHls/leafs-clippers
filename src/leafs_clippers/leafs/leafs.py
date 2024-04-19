@@ -4,7 +4,13 @@ import glob
 import struct
 
 import h5py
+from tqdm import tqdm
 import numpy as np
+
+try:
+    from singularity_eos import Helmholtz
+except ImportError:
+    pass
 
 from leafs_clippers.util import utilities as util
 
@@ -33,6 +39,9 @@ def readsnap(
     quiet=False,
     legacy=False,
     little_endian=True,
+    write_derived=True,
+    ignore_cache=False,
+    helm_table="helm_table.dat",
 ):
     if legacy:
         return LeafsLegacySnapshot(
@@ -45,17 +54,59 @@ def readsnap(
         return LeafsSnapshot(
             os.path.join(snappath, "{:s}o{:03d}.hdf5".format(model, int(ind))),
             quiet=quiet,
+            helm_table="helm_table.dat",
+            write_derived=write_derived,
+            ignore_cache=ignore_cache,
         )
 
 
 class LeafsSnapshot:
-    def __init__(self, filename, quiet=False):
+    def __init__(
+        self,
+        filename,
+        quiet=False,
+        helm_table="helm_table.dat",
+        write_derived=True,
+        ignore_cache=False,
+    ):
+        """
+        Read a LEAFS snapshot from an HDF5 file.
+
+        Parameters
+        ----------
+        filename : str
+            The filename of the snapshot.
+        quiet : bool, optional
+            If True, suppress output.
+        helm_table : str, optional
+            The filename of the EOS table. Needed for functions that require the EOS.
+        write_derived : bool, optional
+            If True, derived quantities will be written to a npy file in the same directory
+            as the snapshot. Unless called with 'ignore_cache=True', the derived
+            quantities will be read from the cache file when available.
+        ignore_cache : bool, optional
+            If True, the cache file will be ignored and derived quantities will be recomputed.
+        """
         self.quiet = quiet
         self.filename = filename
+        self.basename = filename.replace(".hdf5", "")
+        self.helm_table = helm_table
+        self.write_derived = write_derived
+        self.ignore_cache = ignore_cache
+
         try:
             f = h5py.File(filename, "r")
         except FileNotFoundError:
             raise FileNotFoundError("File {} not found.".format(filename))
+
+        try:
+            if os.path.exists(helm_table):
+                self.eos = Helmholtz(helm_table)
+            else:
+                print("No EOS table found, setting eos to None.")
+                self.eos = None
+        except NameError:
+            self.eos = None
 
         # Read meta data
         try:
@@ -84,6 +135,72 @@ class LeafsSnapshot:
         else:
             raise AttributeError("{} has no attribute '{}'.".format(type(self), __name))
 
+    @property
+    def mass(self):
+        return self.density * self.vol
+
+    @property
+    def vel_abs(self):
+        _ = self.get_abs_velocity()
+        return self.data["vel_abs"]
+
+    def _load_derived(self, field):
+        """
+        Load derived quantity from cache hdf5 file.
+
+        Parameters
+        ----------
+        field : str
+            The name of the derived quantity.
+
+        Returns
+        -------
+        bool
+            True if the field was found in the cache file, False otherwise.
+        """
+        cache_filename = self.basename + "_derived.hdf5"
+        try:
+            with h5py.File(cache_filename, "r") as f:
+                if field in f:
+                    self.data[field] = f[field][...]
+                    return True
+                else:
+                    return False
+        except FileNotFoundError:
+            return False
+
+    def _write_derived(self, field):
+        """
+        Write derived quantity to cache hdf5 file.
+
+        Parameters
+        ----------
+        field : str
+            The name of the derived quantity.
+        """
+        cache_filename = self.basename + "_derived.hdf5"
+        with h5py.File(cache_filename, "a") as f:
+            if field not in f:
+                f.create_dataset(field, data=self.data[field])
+            else:
+                f[field][...] = self.data[field]
+
+        return
+
+    def get_abs_velocity(self):
+        if not self.ignore_cache:
+            if self._load_derived("vel_abs"):
+                return
+
+        self.data["vel_abs"] = np.sqrt(
+            self.data["velx"] ** 2 + self.data["vely"] ** 2 + self.data["velz"] ** 2
+        )
+
+        if self.write_derived:
+            self._write_derived("vel_abs")
+
+        return self.data["vel_abs"]
+
     def get_density_in_radius(self, center, radius):
         """return the density in a sphere of radius around center"""
         assert len(center) == 3, "Center must be a 3D point"
@@ -99,7 +216,45 @@ class LeafsSnapshot:
         )
         return self.density[rad < radius]
 
-    def get_bound_material(self, include_internal_energy=False):
+    def get_internal_energy_from_eos(self):
+        """
+        Compute the internal energy from the EOS.
+        """
+        # Attempt to load internal energy from cache
+        if not self.ignore_cache:
+            if self._load_derived("e_internal"):
+                return
+
+        if not self.quiet:
+            print("Computing internal energy from EOS...")
+
+        self.data["e_internal"] = np.zeros_like(self.density)
+        if self.eos is None:
+            print("No EOS available, setting internal energy to zero.")
+        for i in tqdm(range(self.gnx)):
+            for j in range(self.gny):
+                for k in range(self.gnz):
+                    # Ye = zbar / abar => zbar = Ye * abar
+                    # Use arbitrary abar = 16, only needed to recalculate Ye internally
+                    abar = 16
+                    zbar = abar * self.ye[i, j, k]
+                    self.e_internal[i, j, k] = (
+                        self.eos.InternalEnergyFromDensityTemperature(
+                            self.density[i, j, k],
+                            self.temp[i, j, k],
+                            np.array([abar, zbar, np.log10(self.temp[i, j, k])]),
+                        )
+                    )
+
+        # Write internal energy to cache
+        if self.write_derived:
+            self._write_derived("e_internal")
+
+        return
+
+    def get_bound_material(
+        self, include_internal_energy=True, eint_from_eos=False, vacuum_threshold=1e-5
+    ):
         """
         Returns a boolean mask for the bound material.
         If include_internal_energy is True, the internal energy
@@ -110,13 +265,29 @@ class LeafsSnapshot:
             E_kin + E_grav + E_int < 0
         """
 
+        if not self.ignore_cache:
+            if self._load_derived("bound_mask"):
+                return self.data["bound_mask"]
+
+        if eint_from_eos:
+            self.get_internal_energy_from_eos()
+
         total_energy = self.egrav + self.ekin
         if include_internal_energy:
-            total_energy += self.eintkin
+            if eint_from_eos:
+                total_energy += self.e_internal
+            else:
+                total_energy += self.energy
 
-        return total_energy < 0
+        self.data["bound_mask"] = np.logical_and(
+            total_energy < 0, self.density > vacuum_threshold
+        )
+        if self.write_derived:
+            self._write_derived("bound_mask")
 
-    def get_bound_mass(self, include_internal_energy=False):
+        return self.data["bound_mask"]
+
+    def get_bound_mass(self, include_internal_energy=True, eint_from_eos=False):
         """
         Returns the mass of the bound material.
         If include_internal_energy is True, the internal energy
@@ -127,7 +298,9 @@ class LeafsSnapshot:
             E_kin + E_grav + E_int < 0
         """
 
-        bound_mask = self.get_bound_material(include_internal_energy)
+        bound_mask = self.get_bound_material(
+            include_internal_energy, eint_from_eos=eint_from_eos
+        )
         return np.sum(self.density[bound_mask] * self.vol[bound_mask])
 
     def get_central_value(self, value):
