@@ -6,6 +6,7 @@ import struct
 import h5py
 from tqdm import tqdm
 import numpy as np
+from scipy.stats import binned_statistic
 
 try:
     from singularity_eos import Helmholtz
@@ -143,6 +144,10 @@ class LeafsSnapshot:
     def vel_abs(self):
         _ = self.get_abs_velocity()
         return self.data["vel_abs"]
+
+    @property
+    def radius(self):
+        return self.data["geomx"][self.gnx // 2 :]
 
     def _load_derived(self, field):
         """
@@ -313,6 +318,52 @@ class LeafsSnapshot:
         return np.mean(
             self.data[value][mid - 1 : mid + 2, mid - 1 : mid + 2, mid - 1 : mid + 2]
         )
+
+    def get_rad_profile(self, value, res=None, statistic="mean"):
+        """
+        Returns the (1D) radial averaged profile of a quantity.
+        Uses binned_statistic to bin the data.
+        If res is not None, the data will be binned into original resolution.
+
+        Parameters
+        ----------
+        value : str
+            The name of the quantity to bin.
+        res : int, optional
+            The resolution to bin the data into.
+        statistic : str, optional
+            The statistic to compute in each bin. Passed to binned_statistic.
+
+        Returns
+        -------
+        bin_centers : np.ndarray
+            The bin centers.
+        bin_values : np.ndarray
+            The binned values.
+        """
+        assert isinstance(value, str), "Value must be a string"
+
+        xx, yy, zz = np.meshgrid(self.geomx, self.geomy, self.geomz)
+        r = np.sqrt(xx**2 + yy**2 + zz**2)
+
+        r_flat = r.flatten()
+        value_flat = self.data[value].flatten()
+
+        # Sort by radius
+        idx = np.argsort(r_flat)
+        r_sorted = r_flat[idx]
+        value_sorted = value_flat[idx]
+
+        # Bin back into original resolution
+        if res is None:
+            res = len(self.geomx) // 2
+
+        bin_values, bin_edges, _ = binned_statistic(
+            r_sorted, value_sorted, bins=res, statistic=statistic
+        )
+        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+        return bin_centers, bin_values
 
 
 class LeafsLegacySnapshot(LeafsSnapshot):
