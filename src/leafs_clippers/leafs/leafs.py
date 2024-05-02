@@ -137,7 +137,7 @@ class LeafsSnapshot:
 
     @property
     def mass(self):
-        return self.density * self.vol
+        return np.array(self.density * self.vol, dtype=np.float64)
 
     @property
     def vel_abs(self):
@@ -272,12 +272,13 @@ class LeafsSnapshot:
         if eint_from_eos:
             self.get_internal_energy_from_eos()
 
-        total_energy = self.egrav + self.ekin
+        # Note that quantities are stored per unit mass
+        total_energy = (self.egrav + self.ekin) * self.mass
         if include_internal_energy:
             if eint_from_eos:
                 total_energy += self.e_internal
             else:
-                total_energy += self.energy
+                total_energy += self.energy * self.mass
 
         self.data["bound_mask"] = np.logical_and(
             total_energy < 0, self.density > vacuum_threshold
