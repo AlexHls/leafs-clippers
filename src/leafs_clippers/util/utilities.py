@@ -1,3 +1,7 @@
+from os import SEEK_SET
+import struct
+
+import pylab
 import numpy as np
 import pandas as pd
 
@@ -132,3 +136,54 @@ def extrapolate_oda_aux(array):
                 new_array[i * 13 + j] = array[i * 12 + j]
 
     return new_array
+
+
+def readmatrix(f, dim, dtype="f", completerecord=False, swap=False, endian=""):
+    # read header
+    s = f.read(4)
+    if len(s) < 4:
+        return False
+
+    (length,) = struct.unpack(endian + "i", s)
+
+    start = f.tell()
+
+    if isinstance(dim, int):
+        if np.dtype(dtype).itemsize * dim > length:
+            print(
+                "Attempt to read %d bytes, but the record contains only %d."
+                % (np.dtype(dtype).itemsize * dim, length)
+            )
+            return False
+
+        matrix = np.fromfile(f, dtype=dtype, count=dim)
+    elif (
+        (isinstance(dim, list))
+        or (isinstance(dim, tuple))
+        or (isinstance(dim, np.ndarray))
+    ):
+        if len(dim) < 1:
+            print(
+                "Empty lists are not allowed to define the dimension of the array to read."
+            )
+            return False
+
+        size = dim[0]
+        i = 1
+        while i < len(dim):
+            size = size * dim[i]
+            i = i + 1
+
+        dims = pylab.array(dim)
+        matrix = pylab.transpose(
+            np.fromfile(f, dtype=dtype, count=size).reshape(dim[::-1])
+        )
+    else:
+        print("Datatype %s not supported to define the dimension." % type(dim))
+
+    if completerecord:
+        f.seek(start + length + 4, SEEK_SET)
+
+    if swap:
+        matrix.byteswap(True)
+    return matrix

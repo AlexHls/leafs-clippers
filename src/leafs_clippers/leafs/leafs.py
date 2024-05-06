@@ -663,3 +663,95 @@ class LeafsLegacySnapshot(LeafsSnapshot):
                 dset[...] = self.data[k]
 
         return
+
+
+class LeafsProtocol:
+    def __init__(self, model, snappath="./", quiet=False, simulation_type="ONeDef"):
+        self.model = model
+        self.snappath = snappath
+        self.quiet = quiet
+
+        assert simulation_type in [
+            "CODef",
+            "ONeDef",
+            "HeDet",
+        ], "Unrecognized simulation type"
+        self.simulation_type = simulation_type
+
+        self.keys = [
+            "time",
+            "mass",
+            "ene",
+            "ekin",
+            "enuc",
+            "etur",
+            "egrav",
+            "dpole1",
+            "dpole2",
+            "qpole1",
+            "qpole2",
+            "prod",
+            "diss",
+            "diff",
+            "mass_xn",
+            "mass_nifs",
+        ]
+        self.keylen = [1, 1, 1, 1, 1, 1, 1, 3, 3, 5, 5, 1, 1, 1, 5, 1]
+
+        if simulation_type == "ONeDef":
+            self.keylen = [1, 1, 1, 1, 1, 1, 1, 3, 3, 5, 5, 1, 1, 1, 6, 1]
+            # self.keys.extend(["min_ye", "max_rho"])
+            # self.keylen.extend([1, 1])
+
+        self.proto = {}
+        self._read_protocol()
+
+    def _read_protocol(self):
+        j = 0
+        filename = os.path.join(self.snappath, self.model + "%03d.bprot" % j)
+        while os.path.exists(filename):
+            f = open(filename, "rb")
+
+            matrix = util.readmatrix(
+                f,
+                sum(self.keylen),
+                dtype="d",
+                completerecord=True,
+            )
+            while isinstance(matrix, np.ndarray):
+                c = 0
+                for i in range(len(self.keys)):
+                    key = self.keys[i]
+                    if key not in self.proto:
+                        if self.keylen[i] > 1:
+                            self.proto[key] = np.reshape(
+                                matrix[c : c + self.keylen[i]], [self.keylen[i], 1]
+                            )
+                        else:
+                            self.proto[key] = matrix[c : c + self.keylen[i]]
+                    else:
+                        if self.keylen[i] > 1:
+                            self.proto[key] = np.append(
+                                self.proto[key],
+                                np.reshape(
+                                    matrix[c : c + self.keylen[i]], [self.keylen[i], 1]
+                                ),
+                                axis=1,
+                            )
+                        else:
+                            self.proto[key] = np.append(
+                                self.proto[key], matrix[c : c + self.keylen[i]], axis=0
+                            )
+
+                    c = c + self.keylen[i]
+
+                matrix = util.readmatrix(
+                    f, sum(self.keylen), dtype="d", completerecord=True
+                )
+
+            f.close()
+            j += 1
+            filename = os.path.join(self.snappath, self.model + "%03d.bprot" % j)
+
+        if j == 0:
+            raise FileNotFoundError("No protocol files found.")
