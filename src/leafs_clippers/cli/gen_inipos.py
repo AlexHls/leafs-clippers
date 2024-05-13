@@ -92,8 +92,8 @@ def plot_bubbles(x, y, z, r_bub, outname, wd_rad=None, plot_type="plotly"):
     return
 
 
-def create_uniform_bubbles(n_bub, r_cen, r_sphere):
-    max_coord = r_sphere / np.sqrt(3)
+def create_uniform_bubbles(n_bub, r_bub, r_cen, r_sphere):
+    max_coord = (r_sphere - 2 * r_bub) / 2
     x_coords = np.linspace(-max_coord, max_coord, n_bub) + r_cen
     y_coords = np.linspace(-max_coord, max_coord, n_bub)
     z_coords = np.linspace(-max_coord, max_coord, n_bub)
@@ -146,7 +146,7 @@ def main(
             y = np.array([0.0])
             z = np.array([0.0])
         else:
-            x, y, z = create_uniform_bubbles(n_bub, r_cen, r_sphere)
+            x, y, z = create_uniform_bubbles(n_bub, r_bub, r_cen, r_sphere)
     elif distribution_type == "gaussian":
         x, y, z = create_gaussian_bubbles(n_bub, r_cen, r_sphere)
     else:
