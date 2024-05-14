@@ -581,7 +581,8 @@ class LeafsLegacySnapshot(LeafsSnapshot):
                 raise ValueError("This simulaiton type should not have 6 species")
             xtot += self.data["xnuc06"]
 
-        self.mass = np.sum(self.data["density"] * self.vol)
+        # Conflicts with the property in the parent class
+        #self.mass = np.sum(self.data["density"] * self.vol)
         if "nifs" in self.data:
             self.mass_nifs = np.sum(self.data["nifs"] * self.data["density"] * self.vol)
         if "xnuc01" in self.data:

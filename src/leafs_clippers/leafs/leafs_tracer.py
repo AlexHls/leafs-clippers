@@ -201,6 +201,105 @@ class LeafsTracer:
             print("Time runs from ", times[0], " to ", times[-1])
         return np.array(times)
 
+    def count_timesteps(self):
+        timestepcount = 0
+        for i in range(self.nfiles):
+            print("Doing file " + self.files[i])
+
+            f = open(self.files[i], "rb")
+            if i == 0:
+                f.seek(self.headerlen, 0)
+
+            dum1 = f.read(4)
+            while len(dum1) > 0:
+                (time,) = struct.unpack("<d", f.read(8))
+                f.seek(4 * self.npart * (self.nvalues - 1), 1)
+
+                if (i == self.nfiles - 1) or (time < self.starttimes[i + 1]):
+                    timestepcount += 1
+                else:
+                    break
+
+                dum2 = f.read(4)
+                dum1 = f.read(4)
+            f.close()
+
+        print("Found %d timesteps." % timestepcount)
+        return timestepcount
+
+    def attimestep(self, tstp, two_d=False, usefile=None, quiet=False):
+        # set two_d to avoid getting wrong dictionary entries
+
+        index = tstp
+        if usefile is None:
+            for fileid in range(self.nfiles):
+                count = 0
+                f = open(self.files[fileid], "rb")
+                if fileid == 0:
+                    f.seek(self.headerlen, 0)
+
+                dum1 = f.read(4)
+                while len(dum1) > 0:
+                    (time,) = struct.unpack("<d", f.read(8))
+                    f.seek(4 * self.npart * (self.nvalues - 1), 1)
+
+                    if (fileid == self.nfiles - 1) or (
+                        time < self.starttimes[fileid + 1]
+                    ):
+                        count += 1
+                    else:
+                        break
+
+                    dum2 = f.read(4)
+                    dum1 = f.read(4)
+                f.close()
+
+                if index >= count:
+                    index -= count
+                else:
+                    break
+        else:
+            fileid = usefile
+
+        f = open(self.files[fileid], "rb")
+        if fileid == 0:
+            f.seek(self.headerlen, 0)
+
+        f.seek((self.npart * (self.nvalues - 1) * 4 + 8 + 8) * index, 1)
+
+        header = f.read(4)
+        (ttime,) = struct.unpack("<d", f.read(8))
+
+        if not quiet:
+            print(
+                "Loading data of timestep %d at index %d of file %d at time %g."
+                % (tstp, index, fileid, ttime)
+            )
+
+        data = np.fromfile(
+            f, dtype="float32", count=self.npart * (self.nvalues - 1)
+        ).reshape(self.nvalues - 1, self.npart)
+        f.close()
+
+        if self.nvalues == 7 and not two_d:
+            # incorrect for two_d case as pos has only two dimensions then
+            return utilities.dict2obj(
+                {
+                    "pos": data[0:3, :],
+                    "rho": data[3, :],
+                    "temp": data[4, :],
+                    "ene": data[5, :],
+                    "nvalues": self.nvalues,
+                    "time": ttime,
+                }
+            )
+        else:
+            return utilities.dict2obj(
+                {"data": data, "nvalues": self.nvalues, "time": ttime}
+            )
+
+        return False
+
     def get_timestep(
         self,
         tstep,
@@ -602,8 +701,8 @@ class LeafsTracerUtil(object):
                 self.vx = self.raw_data[ind + 1, :]
                 self.vy = self.raw_data[ind + 2, :]
                 ind = ind + 3
-                if not self.threed:
+                if self.threed:
                     self.vz = self.raw_data[ind, :]
                     ind += 1
 
-        self.esc = self.raw_data[ind + 1, :]
+        self.esc = self.raw_data[ind, :]
