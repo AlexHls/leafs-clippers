@@ -140,6 +140,7 @@ def main(
     plot_type="plotly",
 ):
     print("Generating ignition bubbles...")
+    assert distribution_type in ["uniform", "gaussian"], "Distribution type not valid"
     if distribution_type == "uniform":
         if n_bub == 1:
             x = np.array([r_cen])
@@ -149,8 +150,6 @@ def main(
             x, y, z = create_uniform_bubbles(n_bub, r_bub, r_cen, r_sphere)
     elif distribution_type == "gaussian":
         x, y, z = create_gaussian_bubbles(n_bub, r_cen, r_sphere)
-    else:
-        raise ValueError("Distribution type not implemented")
 
     if create_plot:
         print("Plotting bubbles...")
@@ -160,7 +159,10 @@ def main(
 
     f = FortranFile(outname, "w")
 
-    f.write_record(np.array([n_bub], dtype=np.int32))
+    if distribution_type == "uniform":
+        f.write_record(np.array([n_bub**3], dtype=np.int32))
+    elif distribution_type == "gaussian":
+        f.write_record(np.array([n_bub], dtype=np.int32))
     f.write_record(np.array([r_bub]))
     f.write_record(x.T)
     f.write_record(y.T)
