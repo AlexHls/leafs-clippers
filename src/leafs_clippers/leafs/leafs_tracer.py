@@ -563,7 +563,7 @@ class LeafsTracer:
             print("Found %d timesteps." % timestepcount)
         return timestepcount
 
-    def loadalltracer(self, two_d=False, quiet=False):
+    def loadalltracers(self, two_d=False, quiet=False):
         """
         Load all data from all tracers - CAUTION: takes a lot of memory!
 
