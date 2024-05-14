@@ -6,6 +6,31 @@ import numpy as np
 from leafs_clippers.util import utilities
 
 
+def read_tracer(model, snappath="./", npart=0, file="", vartracer=True):
+    """Read tracer files
+
+    Parameters
+    ----------
+    model : str
+        model name
+    snappath : str
+        path to snapshot files
+    npart : int
+        number of particles
+    file : str
+        name of the tracer file
+    vartracer : bool
+        set to use new mass header
+
+    Returns
+    -------
+    LeafsTracer
+        tracer object
+
+    """
+    return LeafsTracer(model, snappath, npart, file, vartracer)
+
+
 class LeafsTracer:
     def __init__(self, model, snappath="./", npart=0, file="", vartracer=True):
         """vartracer: set to use new mass header"""
@@ -508,6 +533,112 @@ class LeafsTracer:
         else:
             return utilities.dict2obj(
                 {"data": data, "nvalues": self.nvalues, "time": time}
+            )
+
+    def count_timesteps(self, quiet=False):
+        timestepcount = 0
+        for i in range(self.nfiles):
+            if not quiet:
+                print("Doing file " + self.files[i])
+
+            f = open(self.files[i], "rb")
+            if i == 0:
+                f.seek(self.headerlen, 0)
+
+            dum1 = f.read(4)
+            while len(dum1) > 0:
+                (time,) = struct.unpack("<d", f.read(8))
+                f.seek(4 * self.npart * (self.nvalues - 1), 1)
+
+                if (i == self.nfiles - 1) or (time < self.starttimes[i + 1]):
+                    timestepcount += 1
+                else:
+                    break
+
+                _ = f.read(4)
+                dum1 = f.read(4)
+            f.close()
+
+        if not quiet:
+            print("Found %d timesteps." % timestepcount)
+        return timestepcount
+
+    def loadalltracer(self, two_d=False, quiet=False):
+        """
+        Load all data from all tracers - CAUTION: takes a lot of memory!
+
+        Parameters
+        ----------
+        two_d : bool
+            set to avoid getting wrong dictionary entries
+        quiet : bool
+            set to suppress output
+
+        Returns
+        -------
+        data : dict2obj
+            data array
+            time, xpos, ypos, zpos, rho, tmp, ene, tye, txn, tbd, tls, tgpot, vx, vy, vz
+        """
+        if not quiet:
+            print("npart: %d, nvalues: %d" % (self.npart, self.nvalues))
+
+        timestepcount = 0
+
+        nsteps = self.count_timesteps(quiet=quiet)
+        values = np.zeros((nsteps, self.npart, self.nvalues), dtype="float32")
+
+        for i in range(self.nfiles):
+            if not quiet:
+                print("Doing file " + self.files[i])
+            f = open(self.files[i], "rb")
+
+            if i == 0:
+                f.seek(self.headerlen, 0)
+
+            dum1 = f.read(4)
+            while len(dum1) > 0:
+                (time,) = struct.unpack("<d", f.read(8))
+
+                if (i == self.nfiles - 1) or (time < self.starttimes[i + 1]):
+                    values[timestepcount, :, 0] = time
+                    data = np.fromfile(
+                        f, dtype="float32", count=self.npart * (self.nvalues - 1)
+                    ).reshape(self.nvalues - 1, self.npart)
+                    values[timestepcount, :, 1:] = data[:, :].T
+
+                    timestepcount += 1
+                else:
+                    break
+
+                _ = f.read(4)
+                dum1 = f.read(4)
+
+            f.close()
+
+        values = values.astype("float64")
+
+        if self.nvalues == 7 and not two_d:
+            # incorrect for two_d case as pos has only two dimensions then
+            return utilities.dict2obj(
+                {
+                    "time": values[:, :, 0],
+                    "pos": values[:, :, 1:4],
+                    "rho": values[:, :, 4],
+                    "temp": values[:, :, 5],
+                    "ene": values[:, :, 6],
+                    "tsteps": timestepcount,
+                    "nvalues": self.nvalues,
+                }
+            )
+        else:
+            return utilities.dict2obj(
+                {
+                    "time": values[:, :, 0],
+                    "data": values[:, :, 1:],
+                    "tsteps": timestepcount,
+                    "nvalues": self.nvalues,
+                }
             )
 
 
