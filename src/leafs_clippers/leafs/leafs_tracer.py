@@ -226,32 +226,6 @@ class LeafsTracer:
             print("Time runs from ", times[0], " to ", times[-1])
         return np.array(times)
 
-    def count_timesteps(self):
-        timestepcount = 0
-        for i in range(self.nfiles):
-            print("Doing file " + self.files[i])
-
-            f = open(self.files[i], "rb")
-            if i == 0:
-                f.seek(self.headerlen, 0)
-
-            dum1 = f.read(4)
-            while len(dum1) > 0:
-                (time,) = struct.unpack("<d", f.read(8))
-                f.seek(4 * self.npart * (self.nvalues - 1), 1)
-
-                if (i == self.nfiles - 1) or (time < self.starttimes[i + 1]):
-                    timestepcount += 1
-                else:
-                    break
-
-                dum2 = f.read(4)
-                dum1 = f.read(4)
-            f.close()
-
-        print("Found %d timesteps." % timestepcount)
-        return timestepcount
-
     def attimestep(self, tstp, two_d=False, usefile=None, quiet=False):
         # set two_d to avoid getting wrong dictionary entries
 
@@ -275,7 +249,7 @@ class LeafsTracer:
                     else:
                         break
 
-                    dum2 = f.read(4)
+                    _ = f.read(4)
                     dum1 = f.read(4)
                 f.close()
 
@@ -292,7 +266,7 @@ class LeafsTracer:
 
         f.seek((self.npart * (self.nvalues - 1) * 4 + 8 + 8) * index, 1)
 
-        header = f.read(4)
+        _ = f.read(4)
         (ttime,) = struct.unpack("<d", f.read(8))
 
         if not quiet:
