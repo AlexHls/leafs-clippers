@@ -192,6 +192,51 @@ class LeafsSnapshot:
 
         return
 
+    def export_to_vtk(self):
+        """
+        Export the snapshot to a VTK file. Requires pyevtk.
+
+        Parameters
+        ----------
+        filename : str
+            The filename of the VTK file.
+        fields : list, optional
+            The list of fields to export. If None, all fields will be exported.
+        """
+        try:
+            from pyevtk.hl import gridToVTK
+        except ImportError:
+            raise ImportError("pyevtk is required to export to VTK")
+
+        vtk_filename = self.basename + ".vtk"
+
+        print("Exporting to VTK file: {}".format(vtk_filename))
+
+        # Generate mesh
+        x, y, z = np.meshgrid(self.edgex, self.edgey, self.edgez)
+
+        cell_data = {}
+        for key in self.keys:
+            # If array isn't 3D, skip
+            if self.data[key].ndim != 3:
+                continue
+            cell_data[key] = self.data[key]
+
+        field_data = {}
+        field_data["time"] = np.array([self.time])
+        field_data["gnx"] = np.array([self.gnx])
+        field_data["gny"] = np.array([self.gny])
+        field_data["gnz"] = np.array([self.gnz])
+        field_data["ncells"] = np.array([self.ncells])
+        field_data["rad_wd"] = np.array([self.rad_wd])
+        field_data["rad_fl"] = np.array([self.rad_fl])
+        field_data["idx_wd"] = np.array([self.idx_wd])
+        field_data["idx_fl"] = np.array([self.idx_fl])
+
+        gridToVTK(vtk_filename, x, y, z, cellData=cell_data, fieldData=field_data)
+
+        return
+
     def get_abs_velocity(self):
         if not self.ignore_cache:
             if self._load_derived("vel_abs"):
@@ -582,7 +627,7 @@ class LeafsLegacySnapshot(LeafsSnapshot):
             xtot += self.data["xnuc06"]
 
         # Conflicts with the property in the parent class
-        #self.mass = np.sum(self.data["density"] * self.vol)
+        # self.mass = np.sum(self.data["density"] * self.vol)
         if "nifs" in self.data:
             self.mass_nifs = np.sum(self.data["nifs"] * self.data["density"] * self.vol)
         if "xnuc01" in self.data:
