@@ -2,10 +2,12 @@ import os
 import re
 import glob
 import struct
+import itertools
 
 import h5py
 from tqdm import tqdm
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.stats import binned_statistic
 
 try:
@@ -14,6 +16,7 @@ except ImportError:
     pass
 
 from leafs_clippers.util import utilities as util
+from leafs_clippers.util import const as const
 
 
 def get_snaplist(model, snappath="./", legacy=False):
@@ -409,6 +412,394 @@ class LeafsSnapshot:
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
         return bin_centers, bin_values
+
+    def _get_label_from_key(self, key):
+        """
+        Get a label for a quantity from its key.
+
+        Parameters
+        ----------
+        key : str
+            The key of the quantity.
+
+        Returns
+        -------
+        label : str
+            The label of the quantity.
+        """
+        try:
+            label = const.KEY_TO_LABEL_DICT[key]
+        except KeyError:
+            label = key
+        return label
+
+    def _get_box_min_max(self, axis="z", boxsize=None, center_offset=0):
+        """
+        Get the min and max indices of a box centered in the domain.
+
+        Parameters
+        ----------
+        axis : str
+            The axis along which to slice.
+        boxsize : int
+            The size of the box in cell counts.
+        center_offset : int, optional
+            Offset from the center of the domain in cell counts.
+
+        Returns
+        -------
+        box_min : int
+            The minimum index of the box.
+        box_max : int
+            The maximum index of the box.
+        """
+        if axis == "z":
+            length = self.gnz
+        elif axis == "y":
+            length = self.gny
+        elif axis == "x":
+            length = self.gnx
+
+        if boxsize is None:
+            boxsize = length
+
+        if boxsize > length:
+            raise ValueError("Boxsize must be smaller than the domain size.")
+
+        n = boxsize // 2
+        box_min = int(length // 2 - n)
+        box_max = int(length // 2 + n)
+
+        if box_min - center_offset < 0:
+            raise ValueError("Box is out of bounds.")
+        if box_max + center_offset > length:
+            raise ValueError("Box is out of bounds.")
+
+        box_min -= center_offset
+        box_max -= center_offset
+
+        return box_min, box_max
+
+    def get_slice(self, key, axis, index, boxsize=None, center_offset=[0, 0]):
+        """
+        Get a 2D slice of a quantity.
+
+        Parameters
+        ----------
+        key : str
+            The name of the quantity to slice.
+        axis : str
+            The axis along which to slice.
+        index : int
+            The index of the slice.
+        boxsize : int, optional
+            The size of the box in cell counts. If None, the whole domain is used.
+        center_offset : list of int, optional
+            Offset from the center of the domain in cell counts.
+
+        Returns
+        -------
+        np.ndarray
+            The 2D slice.
+        """
+        assert axis in ["x", "y", "z"], "Axis must be 'x', 'y', or 'z'"
+        assert isinstance(index, int), "Index must be an integer"
+
+        if axis == "z":
+            axes = ["x", "y"]
+        elif axis == "y":
+            axes = ["x", "z"]
+        elif axis == "x":
+            axes = ["y", "z"]
+
+        box_min_0, box_max_0 = self._get_box_min_max(axes[0], boxsize, center_offset[0])
+        box_min_1, box_max_1 = self._get_box_min_max(axes[1], boxsize, center_offset[1])
+
+        if axis == "z":
+            return self.data[key][box_min_0:box_max_0, box_min_1:box_max_1, index]
+        elif axis == "y":
+            return self.data[key][box_min_0:box_max_0, index, box_min_1:box_max_1]
+        elif axis == "x":
+            return self.data[key][index, box_min_0:box_max_0, box_min_1:box_max_1]
+
+    def _get_edge_slice(self, axis, boxsize=None, center_offset=0):
+        """
+        Get slice of cell edge coordinates.
+
+        Parameters
+        ----------
+        axis : str
+            The axis along which to slice.
+        boxsize : int, optional
+            The size of the box in cell counts. If None, the whole domain is used.
+        center_offset : list of int, optional
+            Offset from the center of the domain in cell counts.
+
+        Returns
+        -------
+        slice_0 : np.ndarray
+            The slice of the edge coordinates.
+        slice_1 : np.ndarray
+            The slice of the edge coordinates.
+
+        """
+        assert axis in ["x", "y", "z"], "Axis must be 'x', 'y', or 'z'"
+        if len(center_offset) < 2:
+            return ValueError("Center offset must be a list of two integers")
+
+        if axis == "z":
+            axes = ["x", "y"]
+        elif axis == "y":
+            axes = ["x", "z"]
+        elif axis == "x":
+            axes = ["y", "z"]
+
+        box_min_0, box_max_0 = self._get_box_min_max(axes[0], boxsize, center_offset[0])
+        box_min_1, box_max_1 = self._get_box_min_max(axes[1], boxsize, center_offset[1])
+
+        if axis == "z":
+            slice_0 = self.data["edgex"][box_min_0 : box_max_0 + 1]
+            slice_1 = self.data["edgey"][box_min_1 : box_max_1 + 1]
+        elif axis == "y":
+            slice_0 = self.data["edgex"][box_min_0 : box_max_0 + 1]
+            slice_1 = self.data["edgez"][box_min_1 : box_max_1 + 1]
+        elif axis == "x":
+            slice_0 = self.data["edgey"][box_min_0 : box_max_0 + 1]
+            slice_1 = self.data["edgez"][box_min_1 : box_max_1 + 1]
+        return slice_0, slice_1
+
+    def _get_geom_slice(self, axis, boxsize=None, center_offset=0):
+        """
+        Get slice of cell geom coordinates.
+
+        Parameters
+        ----------
+        axis : str
+            The axis along which to slice.
+        boxsize : int, optional
+            The size of the box in cell counts. If None, the whole domain is used.
+        center_offset : list of int, optional
+            Offset from the center of the domain in cell counts.
+
+        Returns
+        -------
+        slice_0 : np.ndarray
+            The slice of the geom coordinates.
+        slice_1 : np.ndarray
+            The slice of the geom coordinates.
+
+        """
+        assert axis in ["x", "y", "z"], "Axis must be 'x', 'y', or 'z'"
+        if len(center_offset) < 2:
+            return ValueError("Center offset must be a list of two integers")
+
+        if axis == "z":
+            axes = ["x", "y"]
+        elif axis == "y":
+            axes = ["x", "z"]
+        elif axis == "x":
+            axes = ["y", "z"]
+
+        box_min_0, box_max_0 = self._get_box_min_max(axes[0], boxsize, center_offset[0])
+        box_min_1, box_max_1 = self._get_box_min_max(axes[1], boxsize, center_offset[1])
+
+        if axis == "z":
+            slice_0 = self.data["edgex"][box_min_0:box_max_0]
+            slice_1 = self.data["edgey"][box_min_1:box_max_1]
+        elif axis == "y":
+            slice_0 = self.data["edgex"][box_min_0:box_max_0]
+            slice_1 = self.data["edgez"][box_min_1:box_max_1]
+        elif axis == "x":
+            slice_0 = self.data["edgey"][box_min_0:box_max_0]
+            slice_1 = self.data["edgez"][box_min_1:box_max_1]
+
+        return slice_0, slice_1
+
+    def plot_slice(
+        self,
+        key,
+        ax=None,
+        log=False,
+        Min=None,
+        Max=None,
+        boxsize=None,
+        axis="z",
+        center_offset=[0, 0],
+        index=None,
+        cmap="cubehelix",
+        show_lsets=True,
+        lsets_colors=["white"],
+        lsets_styles=["solid"],
+        rasterized=True,
+        show_cbar=True,
+        show_time=True,
+        cbar_label="from_key",
+    ):
+        """Plot a 2D slice through the simulation data, showing one particular
+        quantity and, if desired, the location of the level set(s).
+
+        Parameters
+        ----------
+        key : str
+            identifier for the quantity to be displayed; the key must be in
+            data dictionary.
+        ax: matplotlib.axes or None
+            axes object into which the plot is placed; if None a new figure
+            with a 111 subplot is created and used (default None)
+        log: bool
+            display quantity linearly or logarithmically (default False)
+        Min: float or None
+            minimum value displayed in the pcolormesh plot (goes into vmin).
+            Everything below will be clipped. If log is True, the logarithm
+            will be automatically calculated before handing it to pcolormesh.
+            If None, the minimum value of the quantity is used (default None)
+        Max : float or None
+            analogous to Min but for the maximum value in the pcolormesh plot
+            (goes into vmax); default None
+        boxsize : int or None
+            size of the box (in cell counts) in which the slice is taken;
+            if None, the whole domain is used (default None)
+        axis : str
+            axis along which the slice is taken; must be 'x', 'y', or 'z'
+            (default 'z')
+        center_offset : list of int
+            offset from the center of the domain in cell counts. The first
+            two entries are used, any further entries are ignored (default [0, 0])
+        index : int or None
+            index of the slice along the axis; if None, the middle slice is
+            taken (default None)
+        cmap : str or matplotlib.cm object
+            color map to be used in pcolormesh (default 'cubehelix')
+        show_lsets : bool
+            show contours of the zero level set(s) (default True)
+        lsets_colors : list of str
+            list of colors to be used for the display of the level set(s). If
+            number of list entries if smaller than the number of level sets
+            shown, the list entries are recycled (default ["white"])
+        lsets_styles : list of str
+            list of line styles for the display of the level set(s). Works in
+            the same way as lsets_colors (default ["solid"]).
+        rasterized : bool
+            passed directly to pcolormesh (default True)
+        show_cbar : bool
+            whether to show a colorbar. If so, space is always taken from ax
+            (default True).
+        show_time : bool
+            whether to display the time of the snapshot (in s) as the plot
+            title (default True)
+        cbar_label : str
+            label to be put onto the colorbar; if 'from_key' is used, the key
+            is displayed, if log is set to True, the cbar_label is prepended by
+            'log', if an empty string is provided no label will be shown
+            (default 'from_key')
+
+        Returns
+        -------
+        ax : matplotlib.axes
+            axes object containing the Slice
+        """
+
+        if index is None:
+            index = int(self.gnz // 2)
+
+        G2 = None
+
+        try:
+            Z = self.get_slice(
+                key, axis, index, boxsize=boxsize, center_offset=center_offset
+            ).T
+        except KeyError:
+            raise ValueError("No quantity named {:s} in data dictionary".format(key))
+        if show_lsets:
+            G1 = self.get_slice(
+                "lset1",
+                axis,
+                index,
+                boxsize=boxsize,
+                center_offset=center_offset,
+            ).T
+            try:
+                G2 = self.get_slice(
+                    "lset2",
+                    axis,
+                    index,
+                    boxsize=boxsize,
+                    center_offset=center_offset,
+                ).T
+            except KeyError:
+                pass
+
+        if Min is None:
+            Min = np.min(Z)
+        if Max is None:
+            Max = np.max(Z)
+        if log:
+            Z = np.log10(Z)
+            Min = np.log10(Min)
+            Max = np.log10(Max)
+
+        grid_0, grid_1 = self._get_edge_slice(
+            axis, boxsize=boxsize, center_offset=center_offset
+        )
+        geom_0, geom_1 = self._get_geom_slice(
+            axis, boxsize=boxsize, center_offset=center_offset
+        )
+
+        lsets_colors = itertools.cycle(lsets_colors)
+        lsets_styles = itertools.cycle(lsets_styles)
+
+        if ax is None:
+            ax = plt.figure().add_subplot(111)
+        im = ax.pcolormesh(
+            grid_0,
+            grid_1,
+            Z,
+            cmap=cmap,
+            vmin=Min,
+            vmax=Max,
+            rasterized=rasterized,
+        )
+        if show_lsets:
+            ax.contour(
+                geom_0,
+                geom_1,
+                G1,
+                [0],
+                colors=next(lsets_colors),
+                linestyles=next(lsets_styles),
+            )
+            if G2 is not None:
+                ax.contour(
+                    geom_0,
+                    geom_1,
+                    G2,
+                    [0],
+                    colors=next(lsets_colors),
+                    linestyles=next(lsets_styles),
+                )
+        ax.axis("image")
+        if axis == "z":
+            xlabel = r"$x$ (cm)"
+            ylabel = r"$y$ (cm)"
+        elif axis == "y":
+            xlabel = r"$x$ (cm)"
+            ylabel = r"$z$ (cm)"
+        elif axis == "x":
+            xlabel = r"$y$ (cm)"
+            ylabel = r"$z$ (cm)"
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        if show_time:
+            ax.set_title(r"$t = {:>8.4f}\,\mathrm{{s}}$".format(self.time))
+        if show_cbar:
+            cbar = plt.colorbar(im)
+            if cbar_label != "":
+                if cbar_label == "from_key":
+                    cbar_label = self._get_label_from_key(key)
+                if log:
+                    cbar_label = r"$\log\,$" + cbar_label
+                cbar.set_label(cbar_label)
+        return ax
 
 
 class LeafsLegacySnapshot(LeafsSnapshot):
