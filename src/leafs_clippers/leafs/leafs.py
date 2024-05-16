@@ -433,6 +433,26 @@ class LeafsSnapshot:
             label = key
         return label
 
+    def _get_cmap_from_key(self, key):
+        """
+        Get a colormap for a quantity from its key.
+
+        Parameters
+        ----------
+        key : str
+            The key of the quantity.
+
+        Returns
+        -------
+        cmap : str
+            The colormap of the quantity.
+        """
+        try:
+            cmap = const.KEY_TO_CMAP_DICT[key]
+        except KeyError:
+            cmap = "cubehelix"
+        return cmap
+
     def _get_box_min_max(self, axis="z", boxsize=None, center_offset=0):
         """
         Get the min and max indices of a box centered in the domain.
@@ -615,6 +635,42 @@ class LeafsSnapshot:
 
         return slice_0, slice_1
 
+    def plot_grid_lines(
+        self, ax=None, axis="z", boxsize=None, center_offset=[0, 0], linecolor="black"
+    ):
+        """
+        Plot grid lines in a 2D slice.
+
+        Parameters
+        ----------
+        ax : matplotlib.axes, optional
+            The axes to plot on. If None, a new figure is created.
+        axis : str, optional
+            The axis along which to slice.
+        boxsize : int, optional
+            The size of the box in cell counts. If None, the whole domain is used.
+        center_offset : list of int, optional
+            Offset from the center of the domain in cell counts.
+        linecolor : str, optional
+            The color of the grid lines.
+
+        Returns
+        -------
+        ax : matplotlib.axes
+            The axes containing the plot.
+        """
+        if ax is None:
+            ax = plt.figure().add_subplot(111)
+
+        slice_0, slice_1 = self._get_edge_slice(axis, boxsize, center_offset)
+
+        for i in range(len(slice_0)):
+            ax.axvline(slice_0[i], color=linecolor, lw=0.5)
+        for i in range(len(slice_1)):
+            ax.axhline(slice_1[i], color=linecolor, lw=0.5)
+
+        return ax
+
     def plot_slice(
         self,
         key,
@@ -626,7 +682,7 @@ class LeafsSnapshot:
         axis="z",
         center_offset=[0, 0],
         index=None,
-        cmap="cubehelix",
+        cmap=None,
         show_lsets=True,
         lsets_colors=["white"],
         lsets_styles=["solid"],
@@ -634,6 +690,8 @@ class LeafsSnapshot:
         show_cbar=True,
         show_time=True,
         cbar_label="from_key",
+        plot_grid_lines=False,
+        plot_gl_color="black",
     ):
         """Plot a 2D slice through the simulation data, showing one particular
         quantity and, if desired, the location of the level set(s).
@@ -669,7 +727,7 @@ class LeafsSnapshot:
             index of the slice along the axis; if None, the middle slice is
             taken (default None)
         cmap : str or matplotlib.cm object
-            color map to be used in pcolormesh (default 'cubehelix')
+            color map to be used in pcolormesh (default 'None')
         show_lsets : bool
             show contours of the zero level set(s) (default True)
         lsets_colors : list of str
@@ -692,6 +750,10 @@ class LeafsSnapshot:
             is displayed, if log is set to True, the cbar_label is prepended by
             'log', if an empty string is provided no label will be shown
             (default 'from_key')
+        plot_grid_lines : bool
+            whether to plot grid lines (default False)
+        plot_gl_color : str
+            color of the grid lines (default 'black')
 
         Returns
         -------
@@ -748,6 +810,8 @@ class LeafsSnapshot:
         lsets_colors = itertools.cycle(lsets_colors)
         lsets_styles = itertools.cycle(lsets_styles)
 
+        if cmap is None:
+            cmap = self._get_cmap_from_key(key)
         if ax is None:
             ax = plt.figure().add_subplot(111)
         im = ax.pcolormesh(
@@ -799,6 +863,11 @@ class LeafsSnapshot:
                 if log:
                     cbar_label = r"$\log\,$" + cbar_label
                 cbar.set_label(cbar_label)
+
+        if plot_grid_lines:
+            self.plot_grid_lines(
+                ax, axis, boxsize, center_offset, linecolor=plot_gl_color
+            )
         return ax
 
 

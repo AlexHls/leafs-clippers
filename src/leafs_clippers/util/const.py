@@ -20,3 +20,19 @@ KEY_TO_LABEL_DICT = {
     "xnuc05": r"$xnuc05$",
     "xnuc06": r"$xnuc06$",
 }
+
+KEY_TO_CMAP_DICT = {
+    "density": "inferno",
+    "temp": "afmhot",
+    "pressure": "viridis",
+    "velx": "coolwarm",
+    "vely": "coolwarm",
+    "velz": "coolwarm",
+    "ye": "cividis",
+    "xnuc01": "ocean",
+    "xnuc02": "ocean",
+    "xnuc03": "ocean",
+    "xnuc04": "ocean",
+    "xnuc05": "ocean",
+    "xnuc06": "ocean",
+}
