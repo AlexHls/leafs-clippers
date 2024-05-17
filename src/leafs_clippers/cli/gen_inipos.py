@@ -92,8 +92,10 @@ def plot_bubbles(x, y, z, r_bub, outname, wd_rad=None, plot_type="plotly"):
     return
 
 
-def create_uniform_bubbles(n_bub, r_bub, r_cen, r_sphere):
-    max_coord = (r_sphere - 2 * r_bub) / 2
+def create_uniform_bubbles(
+    n_bub, r_bub, r_cen, r_sphere, include_center=False, uniform_compresion=0.85
+):
+    max_coord = (r_sphere - 2 * r_bub) * uniform_compresion / 2
     x_coords = np.linspace(-max_coord, max_coord, n_bub) + r_cen
     y_coords = np.linspace(-max_coord, max_coord, n_bub)
     z_coords = np.linspace(-max_coord, max_coord, n_bub)
@@ -101,6 +103,11 @@ def create_uniform_bubbles(n_bub, r_bub, r_cen, r_sphere):
     x = []
     y = []
     z = []
+
+    if include_center:
+        x.append(r_cen)
+        y.append(0.0)
+        z.append(0.0)
 
     for i in x_coords:
         for j in y_coords:
@@ -138,6 +145,8 @@ def main(
     create_plot=False,
     wd_rad=None,
     plot_type="plotly",
+    include_center=False,
+    uniform_compresion=0.85,
 ):
     print("Generating ignition bubbles...")
     assert distribution_type in ["uniform", "gaussian"], "Distribution type not valid"
@@ -147,7 +156,14 @@ def main(
             y = np.array([0.0])
             z = np.array([0.0])
         else:
-            x, y, z = create_uniform_bubbles(n_bub, r_bub, r_cen, r_sphere)
+            x, y, z = create_uniform_bubbles(
+                n_bub,
+                r_bub,
+                r_cen,
+                r_sphere,
+                include_center=include_center,
+                uniform_compresion=uniform_compresion,
+            )
     elif distribution_type == "gaussian":
         x, y, z = create_gaussian_bubbles(n_bub, r_cen, r_sphere)
 
@@ -231,6 +247,17 @@ def cli():
         choices=["matplotlib", "plotly"],
         default="plotly",
     )
+    parser.add_argument(
+        "--include_center",
+        help="Include a bubble at the center of the distribution. Only works for uniform distribution",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--uniform_compresion",
+        help="Compresion factor for the uniform distribution",
+        type=float,
+        default=0.85,
+    )
 
     args = parser.parse_args()
 
@@ -244,6 +271,7 @@ def cli():
         args.create_plot,
         args.wd_rad,
         args.plot_type,
+        args.include_center,
     )
     return
 
