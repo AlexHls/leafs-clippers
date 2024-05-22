@@ -341,7 +341,9 @@ class LeafsSnapshot:
 
         return self.data["bound_mask"]
 
-    def get_bound_mass(self, include_internal_energy=True, eint_from_eos=False):
+    def get_bound_mass(
+        self, include_internal_energy=True, eint_from_eos=False, use_dmass=True
+    ):
         """
         Returns the mass of the bound material.
         If include_internal_energy is True, the internal energy
@@ -355,7 +357,90 @@ class LeafsSnapshot:
         bound_mask = self.get_bound_material(
             include_internal_energy, eint_from_eos=eint_from_eos
         )
+        if use_dmass:
+            return np.sum(self.dmass[bound_mask])
         return np.sum(self.density[bound_mask] * self.vol[bound_mask])
+
+    def get_kick_velocity(
+        self, include_internal_energy=True, eint_from_eos=False, return_dirs=False
+    ):
+        """
+        Returns the kick velocity of the bound material.
+        If include_internal_energy is True, the internal energy
+        is included in the bound criterion.
+
+        Bound material is defined as material with a negative
+        total energy:
+            E_kin + E_grav + E_int < 0
+        """
+
+        bound_mask = self.get_bound_material(
+            include_internal_energy, eint_from_eos=eint_from_eos
+        )
+        vx = np.sum(
+            (
+                np.array(self.velx, dtype=np.float64)
+                * np.array(self.dmass, dtype=np.float64)
+            )[bound_mask]
+            / const.M_SOL
+        )
+        vy = np.sum(
+            (
+                np.array(self.vely, dtype=np.float64)
+                * np.array(self.dmass, dtype=np.float64)
+            )[bound_mask]
+            / const.M_SOL
+        )
+        vz = np.sum(
+            (
+                np.array(self.velz, dtype=np.float64)
+                * np.array(self.dmass, dtype=np.float64)
+            )[bound_mask]
+            / const.M_SOL
+        )
+
+        vel_kick = np.sqrt(vx**2 + vy**2 + vz**2)
+
+        if return_dirs:
+            return vel_kick, vx, vy, vz
+        return vel_kick
+
+    def get_remnant_info(self, include_internal_energy=True, eint_from_eos=False):
+        """
+        Returns the remnant mass and kick velocity.
+        If include_internal_energy is True, the internal energy
+        is included in the bound criterion.
+
+        Bound material is defined as material with a negative
+        total energy:
+            E_kin + E_grav + E_int < 0
+        """
+
+        bound_mask = self.get_bound_material(
+            include_internal_energy, eint_from_eos=eint_from_eos
+        )
+        bound_mass = self.get_bound_mass(
+            include_internal_energy, eint_from_eos=eint_from_eos
+        )
+        vel_kick, vx, vy, vz = self.get_kick_velocity(
+            include_internal_energy, eint_from_eos=eint_from_eos, return_dirs=True
+        )
+        ige = np.sum((self.dmass * self.xnuc05)[bound_mask]) / const.M_SOL
+        nifs = np.sum((self.dmass * self.nifs)[bound_mask]) / const.M_SOL
+        ime = np.sum((self.dmass * self.xnuc04)[bound_mask]) / const.M_SOL
+        rhomax = np.max(self.density[bound_mask])
+
+        return {
+            "bound_mass": bound_mass,
+            "vel_kick": vel_kick,
+            "vx": vx,
+            "vy": vy,
+            "vz": vz,
+            "ige": ige,
+            "nifs": nifs,
+            "ime": ime,
+            "rhomax": rhomax,
+        }
 
     def get_central_value(self, value):
         """
