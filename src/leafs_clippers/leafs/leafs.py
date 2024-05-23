@@ -410,6 +410,7 @@ class LeafsSnapshot:
         Returns the remnant mass and kick velocity.
         If include_internal_energy is True, the internal energy
         is included in the bound criterion.
+        Quantities are returned in solar masses and km/s.
 
         Bound material is defined as material with a negative
         total energy:
@@ -431,11 +432,11 @@ class LeafsSnapshot:
         rhomax = np.max(self.density[bound_mask])
 
         return {
-            "bound_mass": bound_mass,
-            "vel_kick": vel_kick,
-            "vx": vx,
-            "vy": vy,
-            "vz": vz,
+            "bound_mass": bound_mass / const.M_SOL,
+            "vel_kick": vel_kick / 1e5,
+            "vx": vx / 1e5,
+            "vy": vy / 1e5,
+            "vz": vz / 1e5,
             "ige": ige,
             "nifs": nifs,
             "ime": ime,
