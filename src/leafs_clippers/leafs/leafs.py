@@ -586,6 +586,48 @@ class LeafsSnapshot:
 
         return box_min, box_max
 
+    def _get_slice(self, data, axis, index, boxsize=None, center_offset=0):
+        """
+        Get a 2D slice of a quantity.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            The data to slice.
+        axis : str
+            The axis along which to slice.
+        index : int
+            The index of the slice.
+        boxsize : int, optional
+            The size of the box in cell counts. If None, the whole domain is used.
+        center_offset : int, optional
+            Offset from the center of the domain in cell counts.
+
+        Returns
+        -------
+        np.ndarray
+            The 2D slice.
+        """
+        assert axis in ["x", "y", "z"], "Axis must be 'x', 'y', or 'z'"
+        assert isinstance(index, int), "Index must be an integer"
+
+        if axis == "z":
+            axes = ["x", "y"]
+        elif axis == "y":
+            axes = ["x", "z"]
+        elif axis == "x":
+            axes = ["y", "z"]
+
+        box_min_0, box_max_0 = self._get_box_min_max(axes[0], boxsize, center_offset)
+        box_min_1, box_max_1 = self._get_box_min_max(axes[1], boxsize, center_offset)
+
+        if axis == "z":
+            return data[box_min_0:box_max_0, box_min_1:box_max_1, index]
+        elif axis == "y":
+            return data[box_min_0:box_max_0, index, box_min_1:box_max_1]
+        elif axis == "x":
+            return data[index, box_min_0:box_max_0, box_min_1:box_max_1]
+
     def get_slice(self, key, axis, index, boxsize=None, center_offset=[0, 0]):
         """
         Get a 2D slice of a quantity.
@@ -611,22 +653,9 @@ class LeafsSnapshot:
         assert axis in ["x", "y", "z"], "Axis must be 'x', 'y', or 'z'"
         assert isinstance(index, int), "Index must be an integer"
 
-        if axis == "z":
-            axes = ["x", "y"]
-        elif axis == "y":
-            axes = ["x", "z"]
-        elif axis == "x":
-            axes = ["y", "z"]
-
-        box_min_0, box_max_0 = self._get_box_min_max(axes[0], boxsize, center_offset[0])
-        box_min_1, box_max_1 = self._get_box_min_max(axes[1], boxsize, center_offset[1])
-
-        if axis == "z":
-            return self.data[key][box_min_0:box_max_0, box_min_1:box_max_1, index]
-        elif axis == "y":
-            return self.data[key][box_min_0:box_max_0, index, box_min_1:box_max_1]
-        elif axis == "x":
-            return self.data[key][index, box_min_0:box_max_0, box_min_1:box_max_1]
+        if key not in self.data:
+            raise ValueError("No quantity named {:s} in data dictionary".format(key))
+        return self._get_slice(self.data[key], axis, index, boxsize, center_offset)
 
     def _get_edge_slice(self, axis, boxsize=None, center_offset=0):
         """
@@ -778,6 +807,7 @@ class LeafsSnapshot:
         cbar_label="from_key",
         plot_grid_lines=False,
         plot_gl_color="black",
+        mask=None,
     ):
         """Plot a 2D slice through the simulation data, showing one particular
         quantity and, if desired, the location of the level set(s).
@@ -840,6 +870,9 @@ class LeafsSnapshot:
             whether to plot grid lines (default False)
         plot_gl_color : str
             color of the grid lines (default 'black')
+        mask : np.ndarray or None
+            mask to be applied to the data before plotting; if None, no mask
+            is applied (default None)
 
         Returns
         -------
@@ -850,6 +883,9 @@ class LeafsSnapshot:
         if index is None:
             index = int(self.gnz // 2)
 
+        if mask is not None and mask.shape != self.data[key].shape:
+            raise ValueError("Mask shape must match data shape.")
+
         G2 = None
 
         try:
@@ -858,6 +894,11 @@ class LeafsSnapshot:
             ).T
         except KeyError:
             raise ValueError("No quantity named {:s} in data dictionary".format(key))
+
+        if mask is not None:
+            mask = self._get_slice(mask, axis, index, boxsize, center_offset)
+            Z = np.ma.masked_array(Z, mask=mask)
+
         if show_lsets:
             G1 = self.get_slice(
                 "lset1",
