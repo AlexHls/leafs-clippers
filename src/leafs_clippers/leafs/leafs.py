@@ -814,9 +814,10 @@ class LeafsSnapshot:
 
         Parameters
         ----------
-        key : str
+        key : str or list of str
             identifier for the quantity to be displayed; the key must be in
-            data dictionary.
+            data dictionary. If a list is provided, the quantities are summed
+            up before plotting
         ax: matplotlib.axes or None
             axes object into which the plot is placed; if None a new figure
             with a 111 subplot is created and used (default None)
@@ -889,9 +890,17 @@ class LeafsSnapshot:
         G2 = None
 
         try:
-            Z = self.get_slice(
-                key, axis, index, boxsize=boxsize, center_offset=center_offset
-            ).T
+            if isinstance(key, list):
+                Z = np.zeros(self.data[key[0]].shape)
+                for k in key:
+                    Z += self.data[k].T
+                Z = self._get_slice(Z, axis, index, boxsize, center_offset)
+            elif isinstance(key, str):
+                Z = self.get_slice(
+                    key, axis, index, boxsize=boxsize, center_offset=center_offset
+                ).T
+            else:
+                raise ValueError("Key must be a string or a list of strings")
         except KeyError:
             raise ValueError("No quantity named {:s} in data dictionary".format(key))
 
