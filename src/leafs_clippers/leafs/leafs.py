@@ -654,7 +654,7 @@ class LeafsSnapshot:
         assert isinstance(index, int), "Index must be an integer"
 
         if key not in self.data:
-            raise ValueError("No quantity named {:s} in data dictionary".format(key))
+            raise KeyError("No quantity named {:s} in data dictionary".format(key))
         return self._get_slice(self.data[key], axis, index, boxsize, center_offset)
 
     def _get_edge_slice(self, axis, boxsize=None, center_offset=0):
@@ -890,7 +890,7 @@ class LeafsSnapshot:
             self.data[key].shape if isinstance(key, str) else self.data[key[0]].shape
         )
 
-        if mask is not None and mask.shape != self.data[key].shape:
+        if mask is not None and mask.shape != mask_target_shape:
             raise ValueError("Mask shape must match data shape.")
 
         G2 = None
@@ -951,7 +951,11 @@ class LeafsSnapshot:
         lsets_styles = itertools.cycle(lsets_styles)
 
         if cmap is None:
-            cmap = self._get_cmap_from_key(key)
+            cmap = (
+                self._get_cmap_from_key(key)
+                if isinstance(key, str)
+                else self._get_cmap_from_key(key[0])
+            )
         if ax is None:
             ax = plt.figure().add_subplot(111)
         im = ax.pcolormesh(
@@ -999,7 +1003,11 @@ class LeafsSnapshot:
             cbar = plt.colorbar(im)
             if cbar_label != "":
                 if cbar_label == "from_key":
-                    cbar_label = self._get_label_from_key(key)
+                    cbar_label = (
+                        self._get_label_from_key(key)
+                        if isinstance(key, str)
+                        else self._get_label_from_key(key[0])
+                    )
                 if log:
                     cbar_label = r"$\log\,$" + cbar_label
                 cbar.set_label(cbar_label)
@@ -1008,7 +1016,7 @@ class LeafsSnapshot:
             self.plot_grid_lines(
                 ax, axis, boxsize, center_offset, linecolor=plot_gl_color
             )
-        return ax
+        return im
 
 
 class LeafsLegacySnapshot(LeafsSnapshot):
