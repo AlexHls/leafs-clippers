@@ -884,6 +884,12 @@ class LeafsSnapshot:
         if index is None:
             index = int(self.gnz // 2)
 
+        assert isinstance(key, (str, list)), "Key must be a string or a list of strings"
+
+        mask_target_shape = (
+            self.data[key].shape if isinstance(key, str) else self.data[key[0]].shape
+        )
+
         if mask is not None and mask.shape != self.data[key].shape:
             raise ValueError("Mask shape must match data shape.")
 
@@ -899,8 +905,6 @@ class LeafsSnapshot:
                 Z = self.get_slice(
                     key, axis, index, boxsize=boxsize, center_offset=center_offset
                 ).T
-            else:
-                raise ValueError("Key must be a string or a list of strings")
         except KeyError:
             raise ValueError("No quantity named {:s} in data dictionary".format(key))
 
