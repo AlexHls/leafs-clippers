@@ -107,7 +107,6 @@ class LeafsSnapshot:
             if os.path.exists(helm_table):
                 self.eos = Helmholtz(helm_table)
             else:
-                print("No EOS table found, setting eos to None.")
                 self.eos = None
         except NameError:
             self.eos = None
@@ -1354,8 +1353,8 @@ class LeafsProtocol:
 
         if simulation_type == "ONeDef":
             self.keylen = [1, 1, 1, 1, 1, 1, 1, 3, 3, 5, 5, 1, 1, 1, 6, 1]
-            # self.keys.extend(["min_ye", "max_rho"])
-            # self.keylen.extend([1, 1])
+            self.keys.extend(["min_ye", "max_rho"])
+            self.keylen.extend([1, 1])
 
         self.proto = {}
         self._read_protocol()

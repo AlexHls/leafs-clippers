@@ -537,7 +537,7 @@ class LeafsTracer:
             print("Found %d timesteps." % timestepcount)
         return timestepcount
 
-    def loadalltracers(self, two_d=False, quiet=False):
+    def loadalltracers(self, two_d=False, quiet=False, stride=1):
         """
         Load all data from all tracers - CAUTION: takes a lot of memory!
 
@@ -547,6 +547,8 @@ class LeafsTracer:
             set to avoid getting wrong dictionary entries
         quiet : bool
             set to suppress output
+        stride : int
+            read only every stride-th tracer
 
         Returns
         -------
@@ -560,7 +562,8 @@ class LeafsTracer:
         timestepcount = 0
 
         nsteps = self.count_timesteps(quiet=quiet)
-        values = np.zeros((nsteps, self.npart, self.nvalues), dtype="float32")
+        nparts = self.npart // stride + 1
+        values = np.zeros((nsteps, nparts, self.nvalues), dtype="float32")
 
         for i in range(self.nfiles):
             if not quiet:
@@ -579,7 +582,7 @@ class LeafsTracer:
                     data = np.fromfile(
                         f, dtype="float32", count=self.npart * (self.nvalues - 1)
                     ).reshape(self.nvalues - 1, self.npart)
-                    values[timestepcount, :, 1:] = data[:, :].T
+                    values[timestepcount, :, 1:] = data[:, ::stride].T
 
                     timestepcount += 1
                 else:
