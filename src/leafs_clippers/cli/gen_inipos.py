@@ -176,7 +176,8 @@ def main(
     f = FortranFile(outname, "w")
 
     if distribution_type == "uniform":
-        f.write_record(np.array([n_bub**3], dtype=np.int32))
+        n_bub_out = n_bub**3 + 1 if include_center else n_bub**3
+        f.write_record(np.array([n_bub_out], dtype=np.int32))
     elif distribution_type == "gaussian":
         f.write_record(np.array([n_bub], dtype=np.int32))
     f.write_record(np.array([r_bub]))
