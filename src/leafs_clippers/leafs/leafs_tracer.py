@@ -562,7 +562,10 @@ class LeafsTracer:
         timestepcount = 0
 
         nsteps = self.count_timesteps(quiet=quiet)
-        nparts = self.npart // stride + 1
+        if stride > 1:
+            nparts = self.npart // stride + 1
+        else:
+            nparts = self.npart
         values = np.zeros((nsteps, nparts, self.nvalues), dtype="float32")
 
         for i in range(self.nfiles):
