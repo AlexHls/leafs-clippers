@@ -8,6 +8,7 @@ import h5py
 from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 from scipy.stats import binned_statistic
 
 try:
@@ -518,6 +519,27 @@ class LeafsSnapshot:
             label = key
         return label
 
+    def _get_fmt_from_key(self, key):
+        """
+        Get a format function for a quantity from its key.
+
+        Parameters
+        ----------
+        key : str
+            The key of the quantity.
+
+        Returns
+        -------
+        fmt : function
+            The format function of the quantity.
+        """
+
+        try:
+            fmt = const.KEY_TO_FMT_DICT[key]
+        except KeyError:
+            fmt = const.FLOAT_FMT
+        return fmt
+
     def _get_cmap_from_key(self, key):
         """
         Get a colormap for a quantity from its key.
@@ -807,6 +829,7 @@ class LeafsSnapshot:
         plot_grid_lines=False,
         plot_gl_color="black",
         mask=None,
+        cax=None,
     ):
         """Plot a 2D slice through the simulation data, showing one particular
         quantity and, if desired, the location of the level set(s).
@@ -873,6 +896,9 @@ class LeafsSnapshot:
         mask : np.ndarray or None
             mask to be applied to the data before plotting; if None, no mask
             is applied (default None)
+        cax : matplotlib.axes or None
+            axes object into which the colorbar is placed; if None, the colorbar
+            is placed into the same axes as the plot (default None)
 
         Returns
         -------
@@ -999,7 +1025,8 @@ class LeafsSnapshot:
         if show_time:
             ax.set_title(r"$t = {:>8.4f}\,\mathrm{{s}}$".format(self.time))
         if show_cbar:
-            cbar = plt.colorbar(im)
+            fmt = self._get_fmt_from_key(key)
+            cbar = plt.colorbar(im, cax=cax, format=fmt)
             if cbar_label != "":
                 if cbar_label == "from_key":
                     cbar_label = (

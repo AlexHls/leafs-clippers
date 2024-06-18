@@ -19,6 +19,8 @@ KEY_TO_LABEL_DICT = {
     "xnuc04": r"$xnuc04$",
     "xnuc05": r"$xnuc05$",
     "xnuc06": r"$xnuc06$",
+    "energy": r"$\epsilon$ (erg g$^{-1}$)",
+    "Amean": r"$A_{\rm mean}$",
 }
 
 KEY_TO_CMAP_DICT = {
@@ -35,4 +37,27 @@ KEY_TO_CMAP_DICT = {
     "xnuc04": "ocean",
     "xnuc05": "ocean",
     "xnuc06": "ocean",
+    "energy": "magma",
+}
+
+def FLOAT_FMT(x, pos):
+    return "{:.2f}".format(x)
+def INT_FMT(x, pos):
+    return "{:d}".format(int(x))
+
+KEY_TO_FMT_DICT = {
+    "density": FLOAT_FMT,
+    "temp": FLOAT_FMT,
+    "pressure": FLOAT_FMT,
+    "velx": FLOAT_FMT,
+    "vely": FLOAT_FMT,
+    "velz": FLOAT_FMT,
+    "ye": FLOAT_FMT,
+    "xnuc01": INT_FMT,
+    "xnuc02": INT_FMT,
+    "xnuc03": INT_FMT,
+    "xnuc04": INT_FMT,
+    "xnuc05": INT_FMT,
+    "xnuc06": INT_FMT,
+    "Amean": INT_FMT,
 }

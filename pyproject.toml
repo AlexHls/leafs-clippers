@@ -16,6 +16,14 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dynamic = ["version"]
+dependencies = [
+    "numpy",
+    "pandas",
+    "progressbar2",
+    "mpi4py",
+    "parallel_decorators@git+https://github.com/ohlmann/parallel_decorators",
+]
+
 
 [project.urls]
 "Homepage" = "https://github.com/AlexHls/leafs-clippers"
@@ -24,6 +32,9 @@ dynamic = ["version"]
 [tool]
 [tool.hatch.version]
 path = "src/leafs_clippers/__about__.py"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.target.wheel]
 packages = [
@@ -36,6 +47,7 @@ packages = [
 "bin/clipper-rewrite-tracer" = "src/leafs_clippers/cli/rewrite_tracer.py"
 "bin/clipper-ayann-tocsv" = "src/leafs_clippers/cli/ayann_tracer_to_csv.py"
 "bin/clipper-convert-tohdf5" = "src/leafs_clippers/cli/convert_leafs_to_hdf5.py"
+"bin/clipper-make-plots" = "src/leafs_clippers/cli/make_leafs_plots.py"
 
 [tool.hatch.build.targets.wheel.force-include]
 #"bin/clipper-gen-inipos" = "src/leafs_clippers/cli/gen_inipos.py"
@@ -49,3 +61,4 @@ clipper-prepare-pp = "leafs_clippers.cli.prepare_postprocessing:cli"
 clipper-rewrite-tracer = "leafs_clippers.cli.rewrite_tracer:cli"
 clipper-ayann-tocsv = "leafs_clippers.cli.ayann_tracer_to_csv:cli"
 clipper-convert-tohdf5 = "leafs_clippers.cli.convert_leafs_to_hdf5:cli"
+clipper-make-plots = "leafs_clippers.cli.make_leafs_plots:cli"
