@@ -1,5 +1,6 @@
 import os
 import argparse
+import subprocess
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,12 +39,13 @@ def make_plot(ind, snappath="output", model="one_def", ye_min=0.25, plotdir="plo
     s.plot_slice("Amean", ax=axes[7], log=False, show_time=False, cax=caxes[7], Min=1, Max=56)
 
     plt.suptitle(r"$\Delta x_{\rm min} = %.1f$ km, $\Delta x_{\rm max} = %.1f$ km, t = %.4f s" % (res_min, res_max, s.time))
+
     plt.tight_layout()
 
     plt.savefig(
         os.path.join(plotdir, "slice_%04d.png" % ind),
         dpi=300,
-        bbox_inches='tight',
+        #bbox_inches='tight',
     )
     plt.close()
 
@@ -70,6 +72,15 @@ def main(path='.', model='one_def'):
         print("Making plots...")
 
     make_plot(snaps, snappath=snappath, model=model, ye_min=ye_min, plotdir=plotdir)
+
+    if is_master():
+        try:
+            ffmpeg_cmd = "ffmpeg -y -r 5 -i %s/slice_%%04d.png -c:v libx264 -vf fps=25 -pix_fmt yuv420p %s/slices.mp4" % (plotdir, plotdir)
+            print("Creating movie...")
+            subprocess.run(ffmpeg_cmd, shell=True)
+        except Exception as e:
+            print(e)
+            print("Error creating movie.")
 
     if is_master():
         print("Done!")
