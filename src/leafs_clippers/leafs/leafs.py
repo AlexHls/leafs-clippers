@@ -8,7 +8,7 @@ import h5py
 from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import FuncFormatter 
 from scipy.stats import binned_statistic
 
 try:
@@ -1022,11 +1022,15 @@ class LeafsSnapshot:
             ylabel = r"$z$ (cm)"
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
+        axfmt = util.ScalarFormatterForceFormat()
+        axfmt.set_powerlimits((0, 0))
+        ax.xaxis.set_major_formatter(axfmt)
+        ax.yaxis.set_major_formatter(axfmt)
         if show_time:
             ax.set_title(r"$t = {:>8.4f}\,\mathrm{{s}}$".format(self.time))
         if show_cbar:
             fmt = self._get_fmt_from_key(key)
-            cbar = plt.colorbar(im, cax=cax, format=fmt)
+            cbar = plt.colorbar(im, cax=cax, format=FuncFormatter(fmt))
             if cbar_label != "":
                 if cbar_label == "from_key":
                     cbar_label = (

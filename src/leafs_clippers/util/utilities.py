@@ -4,6 +4,7 @@ import struct
 import pylab
 import numpy as np
 import pandas as pd
+from matplotlib.ticker import ScalarFormatter
 
 
 class anyobject:
@@ -187,3 +188,9 @@ def readmatrix(f, dim, dtype="f", completerecord=False, swap=False, endian=""):
     if swap:
         matrix.byteswap(True)
     return matrix
+
+
+# Taken from https://stackoverflow.com/questions/42142144/displaying-first-decimal-digit-in-scientific-notation-in-matplotlib/42156450#42156450
+class ScalarFormatterForceFormat(ScalarFormatter):
+    def _set_format(self):  # Override function that finds format to use.
+        self.format = "%1.1f"  # Give format here
