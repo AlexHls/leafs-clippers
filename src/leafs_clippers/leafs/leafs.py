@@ -7,9 +7,11 @@ import itertools
 import h5py
 from tqdm import tqdm
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter 
+from matplotlib.ticker import FuncFormatter
 from scipy.stats import binned_statistic
+from scipy.io import FortranFile
 
 try:
     from singularity_eos import Helmholtz
@@ -63,6 +65,64 @@ def readsnap(
             write_derived=write_derived,
             ignore_cache=ignore_cache,
         )
+
+
+def readprotocol(
+    model,
+    snappath="./",
+    simulation_type="ONeDef",
+    quiet=False,
+):
+    """
+    Read the protocol file of a LEAFS simulation.
+
+    Parameters
+    ----------
+    model : str
+        The model name.
+    snappath : str, optional
+        The path to the snapshot files.
+    simulation_type : str, optional
+        The simulation type.
+    quiet : bool, optional
+        If True, suppress output.
+
+    Returns
+    -------
+    LeafsProtocol
+        The protocol object.
+    """
+    return LeafsProtocol(
+        model=model,
+        snappath=snappath,
+        simulation_type=simulation_type,
+        quiet=quiet,
+    )
+
+
+def readflameprotocol(
+    model,
+    snappath="./",
+):
+    """
+    Read the flame protocol file of a LEAFS simulation.
+
+    Parameters
+    ----------
+    model : str
+        The model name.
+    snappath : str, optional
+        The path to the snapshot files.
+
+    Returns
+    -------
+    FlameProtocol
+        The protocol object.
+    """
+    return FlameProtocol(
+        model=model,
+        snappath=snappath,
+    )
 
 
 class LeafsSnapshot:
@@ -1439,3 +1499,203 @@ class LeafsProtocol:
 
         if j == 0:
             raise FileNotFoundError("No protocol files found.")
+
+
+class FlameHistogram:
+    def __init__(self, nbins, ncrit, data_grid, data_binsum) -> None:
+        self.nbins = nbins
+        self.ncrit = ncrit
+        self.data_bin_weights = (
+            np.array(data_binsum[1:], dtype=float) / ncrit
+        )  # First element is always zero
+        self.data_bin_edges = np.array(data_grid)
+        self.data_bin_values = 0.5 * (
+            np.array(data_grid[1:]) + np.array(data_grid[:-1])
+        )
+
+    def percentile(self, p):
+        cumsum = np.cumsum(self.data_bin_weights)
+        cumsum /= cumsum[-1]
+        return np.interp(p, cumsum, self.data_bin_values)
+
+    def plot(self, ax=None):
+        if ax is None:
+            fig, ax = plt.subplots()
+        ax.hist(self.data_bin_values, bins=self.nbins, weights=self.data_bin_weights)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel("value")
+        ax.set_ylabel("count")
+        return ax
+
+
+class FlameProtocol:
+    def __init__(self, model, snappath=".") -> None:
+        time, mach_rise, v_turb_mach, v_burn_mach = np.genfromtxt(
+            f"{snappath}/{model}.half", unpack=True
+        )
+        self.n_tsteps = len(time)
+        self.time = time
+        self.mach_rise_half = mach_rise
+        self.v_turb_half_mach = v_turb_mach
+        self.v_burn_half_mach = v_burn_mach
+
+        self.model = model
+        self.snappath = snappath
+        self._loaded_data = False
+
+        self.percentiles = None
+
+    def _load_hstgr(self, label):
+        histgrs = []
+        with FortranFile(
+            os.path.join(self.snappath, f"{self.model}_{label}.hstgr"), "r"
+        ) as f:
+            for i in tqdm(range(self.n_tsteps)):
+                _ = f.read_reals("<f8")
+                nb, nc = f.read_ints()
+                data_grid = f.read_reals("<f8")
+                data_binsum = f.read_ints("<i4")
+                histgrs.append(FlameHistogram(nb, nc, data_grid, data_binsum))
+        return histgrs
+
+    def load_vburn_hstgr(self):
+        print("Loading vburn histograms...")
+        self.vburn_histgrs = self._load_hstgr("vburn")
+
+    def load_vturb_hstgr(self):
+        print("Loading vturb histograms...")
+        self.vturb_histgrs = self._load_hstgr("vturb")
+
+    def load_machrise_hstgr(self):
+        print("Loading mach_rise histograms...")
+        self.machrise_histgrs = self._load_hstgr("mach_rise")
+
+    def load_vburn_mach_hstgr(self):
+        print("Loading vburn (mach) histograms...")
+        self.vburn_mach_histgrs = self._load_hstgr("vburn_mach")
+
+    def load_vturb_mach_hstgr(self):
+        print("Loading vturb (mach) histograms...")
+        self.vturb_mach_histgrs = self._load_hstgr("vturb_mach")
+
+    def load_all(self):
+        self.load_vburn_hstgr()
+        self.load_vturb_hstgr()
+        self.load_machrise_hstgr()
+        self.load_vburn_mach_hstgr()
+        self.load_vturb_mach_hstgr()
+        self._loaded_data = True
+
+    def get_percentiles(self):
+        if self.percentiles is not None:
+            return self.percentiles
+
+        if not self._loaded_data:
+            self.load_all()
+            self._loaded_data = True
+        percentiles = {
+            "time": self.time,
+        }
+        for p in [0.13, 50.0, 99.87]:
+            percentiles[f"vburn_{p}"] = []
+            percentiles[f"vturb_{p}"] = []
+            percentiles[f"machrise_{p}"] = []
+            percentiles[f"vburn_mach_{p}"] = []
+            percentiles[f"vturb_mach_{p}"] = []
+
+        for i in range(self.n_tsteps):
+            for p in [0.13, 50.0, 99.87]:
+                percentiles[f"vburn_{p}"].append(
+                    self.vburn_histgrs[i].percentile(p / 100)
+                )
+                percentiles[f"vturb_{p}"].append(
+                    self.vturb_histgrs[i].percentile(p / 100)
+                )
+                percentiles[f"machrise_{p}"].append(
+                    self.machrise_histgrs[i].percentile(p / 100)
+                )
+                percentiles[f"vburn_mach_{p}"].append(
+                    self.vburn_mach_histgrs[i].percentile(p / 100)
+                )
+                percentiles[f"vturb_mach_{p}"].append(
+                    self.vturb_mach_histgrs[i].percentile(p / 100)
+                )
+
+        self.percentiles = pd.DataFrame(percentiles)
+
+        return self.percentiles
+
+    def plot_percentiles(self):
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
+
+        percentiles = self.get_percentiles()
+
+        ax1.plot(
+            percentiles["time"],
+            percentiles["vburn_mach_50.0"],
+            label=r"$\langle v_{lam}\rangle$",
+            ls="-.",
+            color="tab:blue",
+        )
+        ax1.plot(
+            percentiles["time"],
+            percentiles["vturb_mach_50.0"],
+            label=r"$\langle v_{turb}\rangle$",
+            ls="-.",
+            color="tab:orange",
+        )
+        ax1.fill_between(
+            percentiles["time"],
+            percentiles["vburn_mach_0.13"],
+            percentiles["vburn_mach_99.87"],
+            alpha=0.5,
+            color="tab:blue",
+        )
+        ax1.fill_between(
+            percentiles["time"],
+            percentiles["vturb_mach_0.13"],
+            percentiles["vturb_mach_99.87"],
+            alpha=0.5,
+            color="tab:orange",
+        )
+
+        ax2.plot(
+            percentiles["time"],
+            percentiles["vburn_50.0"],
+            label=r"$\langle v_{lam}\rangle$",
+            ls="-.",
+            color="tab:blue",
+        )
+        ax2.plot(
+            percentiles["time"],
+            percentiles["vturb_50.0"],
+            label=r"$\langle v_{turb}\rangle$",
+            ls="-.",
+            color="tab:orange",
+        )
+        ax2.fill_between(
+            percentiles["time"],
+            percentiles["vburn_0.13"],
+            percentiles["vburn_99.87"],
+            alpha=0.5,
+            color="tab:blue",
+        )
+        ax2.fill_between(
+            percentiles["time"],
+            percentiles["vturb_0.13"],
+            percentiles["vturb_99.87"],
+            alpha=0.5,
+            color="tab:orange",
+        )
+
+        ax1.set_ylabel(r"$v / c_s$")
+        ax1.set_yscale("log")
+        ax1.legend()
+
+        ax2.set_ylabel(r"$v$ (cm s$^{-1}$)")
+        ax2.set_xlabel("time")
+        ax2.set_yscale("log")
+        ax2.legend()
+
+        return fig, (ax1, ax2)
