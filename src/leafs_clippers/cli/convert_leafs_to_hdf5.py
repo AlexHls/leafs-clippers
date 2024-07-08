@@ -2,6 +2,7 @@ import os
 import argparse
 
 from leafs_clippers.leafs import leafs as lc
+from leafs_clippers.leafs import utils as lu
 
 
 def remove_snap(snapshot, snap, model, directory, no_confirm=False):
@@ -30,6 +31,7 @@ def main(
     no_confirm=False,
     simulation_type="ONeDef",
     big_endian=False,
+    write_xdmf=True,
 ):
     snaplist = lc.get_snaplist(model, snappath=directory, legacy=True)
     for snap in snaplist:
@@ -47,6 +49,20 @@ def main(
             remove_snap(s, snap, model, directory, no_confirm=no_confirm)
 
         print(f"Converted snapshot {snap} to {outfile}")
+
+        if write_xdmf:
+            # Load new snapshot, writing XDMF files is only supported for HDF5 snapshots
+            s = lc.readsnap(
+                snap,
+                model,
+                snappath=directory,
+                legacy=False,
+                simulation_type=simulation_type,
+                little_endian=not big_endian,
+            )
+            writer = lu.LeafsXdmf3Writer(s)
+            writer.write()
+            print(f"Wrote XDMF files for snapshot {snap}")
 
 
 def cli():
@@ -90,6 +106,11 @@ def cli():
         action="store_true",
         help="Big endian",
     )
+    parser.add_argument(
+        "--no_xdmf",
+        action="store_true",
+        help="Do not write XDMF files",
+    )
 
     args = parser.parse_args()
     main(
@@ -100,6 +121,7 @@ def cli():
         no_confirm=args.no_confirm,
         simulation_type=args.simulation_type,
         big_endian=args.big_endian,
+        write_xdmf=not args.no_xdmf,
     )
 
 
