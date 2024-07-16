@@ -1514,6 +1514,8 @@ class FlameHistogram:
         )
 
     def percentile(self, p):
+        if len(self.data_bin_values) == 0:
+            return np.nan
         cumsum = np.cumsum(self.data_bin_weights)
         cumsum /= cumsum[-1]
         return np.interp(p, cumsum, self.data_bin_values)
