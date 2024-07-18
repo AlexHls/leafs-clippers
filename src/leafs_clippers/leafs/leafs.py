@@ -1209,7 +1209,7 @@ class LeafsLegacySnapshot(LeafsSnapshot):
 
                     label = name.lower()
                     if label not in self.data:
-                        self.data[label] = np.fromfile(f, dtype="f", count=length)
+                        self.data[label] = np.fromfile(f, dtype=f"{self.endian}f", count=length)
                     else:
                         f.seek(length * 4, os.SEEK_CUR)
 
@@ -1219,7 +1219,7 @@ class LeafsLegacySnapshot(LeafsSnapshot):
 
                     label = name.lower()
                     if label not in self.data:
-                        self.data[label] = np.fromfile(f, dtype="f", count=length)
+                        self.data[label] = np.fromfile(f, dtype=f"{self.endian}f", count=length)
                     else:
                         f.seek(length * 4, os.SEEK_CUR)
 
@@ -1229,7 +1229,7 @@ class LeafsLegacySnapshot(LeafsSnapshot):
                     label = name.lower()
                     if label not in self.data:
                         self.data[label] = np.zeros(
-                            (self.gnx, self.gny, self.gnz), dtype="f"
+                            (self.gnx, self.gny, self.gnz), dtype=f"{self.endian}f"
                         )
 
                     for i in range(length):
@@ -1243,7 +1243,7 @@ class LeafsLegacySnapshot(LeafsSnapshot):
 
                         # reshape and transpose due to fortran data ordering
                         data = np.transpose(
-                            np.fromfile(f, dtype="f", count=nx * ny * nz).reshape(
+                            np.fromfile(f, dtype=f"{self.endian}f", count=nx * ny * nz).reshape(
                                 (nz, ny, nx)
                             )
                         )
