@@ -40,10 +40,14 @@ KEY_TO_CMAP_DICT = {
     "energy": "magma",
 }
 
+
 def FLOAT_FMT(x, pos):
     return "{:.2f}".format(x)
+
+
 def INT_FMT(x, pos):
     return "{:d}".format(int(x))
+
 
 KEY_TO_FMT_DICT = {
     "density": FLOAT_FMT,
@@ -53,11 +57,11 @@ KEY_TO_FMT_DICT = {
     "vely": FLOAT_FMT,
     "velz": FLOAT_FMT,
     "ye": FLOAT_FMT,
-    "xnuc01": INT_FMT,
-    "xnuc02": INT_FMT,
-    "xnuc03": INT_FMT,
-    "xnuc04": INT_FMT,
-    "xnuc05": INT_FMT,
-    "xnuc06": INT_FMT,
+    "xnuc01": FLOAT_FMT,
+    "xnuc02": FLOAT_FMT,
+    "xnuc03": FLOAT_FMT,
+    "xnuc04": FLOAT_FMT,
+    "xnuc05": FLOAT_FMT,
+    "xnuc06": FLOAT_FMT,
     "Amean": INT_FMT,
 }
