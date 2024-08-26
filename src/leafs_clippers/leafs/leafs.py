@@ -22,18 +22,23 @@ from leafs_clippers.util import utilities as util
 from leafs_clippers.util import const as const
 
 
-def get_snaplist(model, snappath="./", legacy=False):
+def get_snaplist(model, snappath="./", legacy=False, reduced_output=False):
+    file_base = "redo" if reduced_output else "o"
+    glob_pattern = f"{model}{file_base}[0-9][0-9][0-9]"
+
     # check parallel files first
     if legacy:
-        outfiles = glob.glob(model + "o[0-9][0-9][0-9].000", root_dir=snappath)
+        outfiles = glob.glob(glob_pattern + ".000", root_dir=snappath)
         # check output from serial run if nothing was found
         if len(outfiles) == 0:
-            outfiles = glob.glob(model + "o[0-9][0-9][0-9]", root_dir=snappath)
+            outfiles = glob.glob(glob_pattern, root_dir=snappath)
     else:
-        outfiles = glob.glob(model + "o[0-9][0-9][0-9].hdf5", root_dir=snappath)
+        outfiles = glob.glob(glob_pattern + ".hdf5", root_dir=snappath)
     snaplist = []
     for name in outfiles:
-        snaplist.append(int(re.sub(model + r"o([0-9]{3}).*", r"\1", name)))
+        snaplist.append(
+            int(re.sub(f"{model}{file_base}" + r"([0-9]{3}).*", r"\1", name))
+        )
 
     return sorted(snaplist)
 
@@ -49,17 +54,21 @@ def readsnap(
     write_derived=True,
     ignore_cache=False,
     helm_table="helm_table.dat",
+    reduced_output=False,
 ):
+    file_base = "redo" if reduced_output else "o"
     if legacy:
         return LeafsLegacySnapshot(
-            os.path.join(snappath, "{:s}o{:03d}".format(model, int(ind))),
+            os.path.join(snappath, "{:s}{:s}{:03d}".format(model, file_base, int(ind))),
             simulation_type=simulation_type,
             quiet=quiet,
             little_endian=little_endian,
         )
     else:
         return LeafsSnapshot(
-            os.path.join(snappath, "{:s}o{:03d}.hdf5".format(model, int(ind))),
+            os.path.join(
+                snappath, "{:s}{:s}{:03d}.hdf5".format(model, file_base, int(ind))
+            ),
             quiet=quiet,
             helm_table="helm_table.dat",
             write_derived=write_derived,
@@ -1209,7 +1218,9 @@ class LeafsLegacySnapshot(LeafsSnapshot):
 
                     label = name.lower()
                     if label not in self.data:
-                        self.data[label] = np.fromfile(f, dtype=f"{self.endian}f", count=length)
+                        self.data[label] = np.fromfile(
+                            f, dtype=f"{self.endian}f", count=length
+                        )
                     else:
                         f.seek(length * 4, os.SEEK_CUR)
 
@@ -1219,7 +1230,9 @@ class LeafsLegacySnapshot(LeafsSnapshot):
 
                     label = name.lower()
                     if label not in self.data:
-                        self.data[label] = np.fromfile(f, dtype=f"{self.endian}f", count=length)
+                        self.data[label] = np.fromfile(
+                            f, dtype=f"{self.endian}f", count=length
+                        )
                     else:
                         f.seek(length * 4, os.SEEK_CUR)
 
@@ -1243,9 +1256,9 @@ class LeafsLegacySnapshot(LeafsSnapshot):
 
                         # reshape and transpose due to fortran data ordering
                         data = np.transpose(
-                            np.fromfile(f, dtype=f"{self.endian}f", count=nx * ny * nz).reshape(
-                                (nz, ny, nx)
-                            )
+                            np.fromfile(
+                                f, dtype=f"{self.endian}f", count=nx * ny * nz
+                            ).reshape((nz, ny, nx))
                         )
                         self.data[label][x0 - 1 : x1, y0 - 1 : y1, z0 - 1 : z1] = data
 
