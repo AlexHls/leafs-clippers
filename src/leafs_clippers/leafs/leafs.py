@@ -256,11 +256,17 @@ class LeafsSnapshot:
             The name of the derived quantity.
         """
         cache_filename = self.basename + "_derived.hdf5"
-        with h5py.File(cache_filename, "a") as f:
-            if field not in f:
-                f.create_dataset(field, data=self.data[field])
-            else:
-                f[field][...] = self.data[field]
+        try:
+            with h5py.File(cache_filename, "a") as f:
+                if field not in f:
+                    f.create_dataset(field, data=self.data[field])
+                else:
+                    f[field][...] = self.data[field]
+        except PermissionError:
+            print(
+                f"No permission to write in snapshot directory,"
+                f" {field} not cached..."
+            )
 
         return
 
