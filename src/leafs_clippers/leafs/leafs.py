@@ -230,6 +230,10 @@ class LeafsSnapshot:
         _ = self.get_c_sound()
         return self.data["c_sound"]
 
+    @property
+    def mach(self):
+        return self.vel_abs / self.c_sound
+
     def _load_derived(self, field):
         """
         Load derived quantity from cache hdf5 file.
