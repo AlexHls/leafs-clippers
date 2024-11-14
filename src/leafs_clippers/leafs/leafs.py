@@ -205,6 +205,12 @@ class LeafsSnapshot:
         """enable access via object attributes to data dict entries"""
         if __name in self.data:
             return self.data[__name]
+        elif __name == "vel_abs":
+            return self.get_abs_velocity()
+        elif __name == "c_sound":
+            return self.get_c_sound()
+        elif __name == "mach":
+            return self.get_mach()
         else:
             raise AttributeError("{} has no attribute '{}'.".format(type(self), __name))
 
@@ -220,6 +226,16 @@ class LeafsSnapshot:
     @property
     def radius(self):
         return self.data["geomx"][self.gnx // 2 :]
+
+    @property
+    def c_sound(self):
+        _ = self.get_c_sound()
+        return self.data["c_sound"]
+
+    @property
+    def mach(self):
+        _ = self.get_mach()
+        return self.data["mach"]
 
     def _load_derived(self, field):
         """
@@ -329,6 +345,48 @@ class LeafsSnapshot:
 
         return self.data["vel_abs"]
 
+    def get_c_sound(self):
+        if self.eos is None:
+            if not self.quiet:
+                print("No EOS available, setting sound speed to zero.")
+            return np.zeros_like(self.density)
+
+        if not self.ignore_cache:
+            if self._load_derived("c_sound"):
+                return
+
+        self.data["c_sound"] = np.zeros_like(self.density)
+        abar = np.array(self.Amean.flatten(), dtype=np.float64)
+        zbar = abar * np.array(self.ye.flatten(), dtype=np.float64)
+        bmods = np.zeros_like(abar, dtype=np.float64)
+        self.eos.BulkModulusFromDensityTemperature(
+            np.array(self.density.flatten(), dtype=np.float64),
+            np.array(self.temp.flatten(), dtype=np.float64),
+            bmods,
+            len(bmods),
+            np.array([abar, zbar, np.log10(self.temp.flatten())], dtype=np.float64).T,
+        )
+        self.data["c_sound"] = np.array(
+            np.sqrt(bmods / self.density.flatten()).reshape(
+                self.gnx, self.gny, self.gnz
+            ),
+            dtype=np.float64,
+        )
+
+        if self.write_derived:
+            self._write_derived("c_sound")
+
+        return self.data["c_sound"]
+
+    def get_mach(self):
+        self.get_abs_velocity()
+        self.get_c_sound()
+
+        self.data["mach"] = np.zeros_like(self.density)
+        self.data["mach"] = self.vel_abs / self.c_sound
+
+        return self.data["mach"]
+
     def get_density_in_radius(self, center, radius):
         """return the density in a sphere of radius around center"""
         assert len(center) == 3, "Center must be a 3D point"
@@ -363,8 +421,7 @@ class LeafsSnapshot:
             for j in range(self.gny):
                 for k in range(self.gnz):
                     # Ye = zbar / abar => zbar = Ye * abar
-                    # Use arbitrary abar = 16, only needed to recalculate Ye internally
-                    abar = 16
+                    abar = self.Amean[i, j, k]
                     zbar = abar * self.ye[i, j, k]
                     self.e_internal[i, j, k] = (
                         self.eos.InternalEnergyFromDensityTemperature(

@@ -38,6 +38,7 @@ KEY_TO_CMAP_DICT = {
     "xnuc05": "ocean",
     "xnuc06": "ocean",
     "energy": "magma",
+    "mach": "BuPu_r",
 }
 
 
