@@ -210,7 +210,7 @@ class LeafsSnapshot:
         elif __name == "c_sound":
             return self.get_c_sound()
         elif __name == "mach":
-            return self.vel_abs / self.c_sound
+            return self.get_mach()
         else:
             raise AttributeError("{} has no attribute '{}'.".format(type(self), __name))
 
@@ -219,22 +219,8 @@ class LeafsSnapshot:
         return np.array(self.density * self.vol, dtype=np.float64)
 
     @property
-    def vel_abs(self):
-        _ = self.get_abs_velocity()
-        return self.data["vel_abs"]
-
-    @property
     def radius(self):
         return self.data["geomx"][self.gnx // 2 :]
-
-    @property
-    def c_sound(self):
-        _ = self.get_c_sound()
-        return self.data["c_sound"]
-
-    @property
-    def mach(self):
-        return self.vel_abs / self.c_sound
 
     def _load_derived(self, field):
         """
@@ -376,6 +362,12 @@ class LeafsSnapshot:
             self._write_derived("c_sound")
 
         return self.data["c_sound"]
+
+    def get_mach(self):
+        # We don't cache the mach number, it should be fast to compute
+        if "mach" not in self.data:
+            self.data["mach"] = self.vel_abs / self.c_sound
+        return self.data["mach"]
 
     def get_density_in_radius(self, center, radius):
         """return the density in a sphere of radius around center"""
