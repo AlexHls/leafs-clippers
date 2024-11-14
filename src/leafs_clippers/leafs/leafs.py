@@ -205,6 +205,8 @@ class LeafsSnapshot:
         """enable access via object attributes to data dict entries"""
         if __name in self.data:
             return self.data[__name]
+        elif __name == "vel_abs":
+            return self.get_abs_velocity()
         else:
             raise AttributeError("{} has no attribute '{}'.".format(type(self), __name))
 
