@@ -353,19 +353,16 @@ class LeafsSnapshot:
                 return
 
         self.data["c_sound"] = np.zeros_like(self.density)
-        for i in tqdm(range(self.gnx)):
-            for j in range(self.gny):
-                for k in range(self.gnz):
-                    abar = self.Amean[i, j, k]
-                    zbar = abar * self.ye[i, j, k]
-                    self.data["c_sound"][i, j, k] = np.sqrt(
-                        self.eos.BulkModulusFromDensityTemperature(
-                            self.density[i, j, k],
-                            self.temp[i, j, k],
-                            np.array([abar, zbar, np.log10(self.temp[i, j, k])]),
-                        )
-                        / self.density[i, j, k]
-                    )
+        abar = self.Amean.flatten()
+        zbar = abar * self.ye.flatten()
+        self.data["c_sound"] = np.sqrt(
+            self.eos.BulkModulusFromDensityTemperature(
+                self.density.flatten(),
+                self.temp.flatten(),
+                np.array([abar, zbar, np.log10(self.temp.flatten())]),
+            )
+            / self.density.flatten()
+        ).reshape(self.gnx, self.gny, self.gnz)
 
         if self.write_derived:
             self._write_derived("c_sound")
