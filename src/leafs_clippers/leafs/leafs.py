@@ -209,6 +209,8 @@ class LeafsSnapshot:
             return self.get_abs_velocity()
         elif __name == "c_sound":
             return self.get_c_sound()
+        elif __name == "mach":
+            return self.vel_abs / self.c_sound
         else:
             raise AttributeError("{} has no attribute '{}'.".format(type(self), __name))
 
