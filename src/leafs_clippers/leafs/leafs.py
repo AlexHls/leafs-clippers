@@ -219,8 +219,23 @@ class LeafsSnapshot:
         return np.array(self.density * self.vol, dtype=np.float64)
 
     @property
+    def vel_abs(self):
+        _ = self.get_abs_velocity()
+        return self.data["vel_abs"]
+
+    @property
     def radius(self):
         return self.data["geomx"][self.gnx // 2 :]
+
+    @property
+    def c_sound(self):
+        _ = self.get_c_sound()
+        return self.data["c_sound"]
+
+    @property
+    def mach(self):
+        _ = self.get_mach()
+        return self.data["mach"]
 
     def _load_derived(self, field):
         """
@@ -364,9 +379,12 @@ class LeafsSnapshot:
         return self.data["c_sound"]
 
     def get_mach(self):
-        # We don't cache the mach number, it should be fast to compute
-        if "mach" not in self.data:
-            self.data["mach"] = self.vel_abs / self.c_sound
+        self.get_abs_velocity()
+        self.get_c_sound()
+
+        self.data["mach"] = np.zeros_like(self.density)
+        self.data["mach"] = self.vel_abs / self.c_sound
+
         return self.data["mach"]
 
     def get_density_in_radius(self, center, radius):
