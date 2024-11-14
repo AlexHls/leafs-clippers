@@ -353,18 +353,21 @@ class LeafsSnapshot:
                 return
 
         self.data["c_sound"] = np.zeros_like(self.density)
-        abar = self.Amean.flatten()
-        zbar = abar * self.ye.flatten()
-        bmods = np.zeros_like(abar)
+        abar = np.array(self.Amean.flatten(), dtype=np.float64)
+        zbar = abar * np.array(self.ye.flatten(), dtype=np.float64)
+        bmods = np.zeros_like(abar, dtype=np.float64)
         self.eos.BulkModulusFromDensityTemperature(
-            self.density.flatten(),
-            self.temp.flatten(),
+            np.array(self.density.flatten(), dtype=np.float64),
+            np.array(self.temp.flatten(), dtype=np.float64),
             bmods,
             len(bmods),
-            np.array([abar, zbar, np.log10(self.temp.flatten())]),
+            np.array([abar, zbar, np.log10(self.temp.flatten())], dtype=np.float64).T,
         )
-        self.data["c_sound"] = np.sqrt(bmods / self.density.flatten()).reshape(
-            self.gnx, self.gny, self.gnz
+        self.data["c_sound"] = np.array(
+            np.sqrt(bmods / self.density.flatten()).reshape(
+                self.gnx, self.gny, self.gnz
+            ),
+            dtype=np.float64,
         )
 
         if self.write_derived:
