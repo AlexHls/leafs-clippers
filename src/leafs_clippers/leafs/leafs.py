@@ -207,6 +207,8 @@ class LeafsSnapshot:
             return self.data[__name]
         elif __name == "vel_abs":
             return self.get_abs_velocity()
+        elif __name == "c_sound":
+            return self.get_c_sound()
         else:
             raise AttributeError("{} has no attribute '{}'.".format(type(self), __name))
 
@@ -222,6 +224,11 @@ class LeafsSnapshot:
     @property
     def radius(self):
         return self.data["geomx"][self.gnx // 2 :]
+
+    @property
+    def c_sound(self):
+        _ = self.get_c_sound()
+        return self.data["c_sound"]
 
     def _load_derived(self, field):
         """
@@ -331,6 +338,36 @@ class LeafsSnapshot:
 
         return self.data["vel_abs"]
 
+    def get_c_sound(self):
+        if self.eos is None:
+            if not self.quiet:
+                print("No EOS available, setting sound speed to zero.")
+            return np.zeros_like(self.density)
+
+        if not self.ignore_cache:
+            if self._load_derived("c_sound"):
+                return
+
+        self.data["c_sound"] = np.zeros_like(self.density)
+        for i in tqdm(range(self.gnx)):
+            for j in range(self.gny):
+                for k in range(self.gnz):
+                    abar = self.Amean[i, j, k]
+                    zbar = abar * self.ye[i, j, k]
+                    self.data["c_sound"][i, j, k] = np.sqrt(
+                        self.eos.BulkModulusFromDensityTemperature(
+                            self.density[i, j, k],
+                            self.temp[i, j, k],
+                            np.array([abar, zbar, np.log10(self.temp[i, j, k])]),
+                        )
+                        / self.density[i, j, k]
+                    )
+
+        if self.write_derived:
+            self._write_derived("c_sound")
+
+        return self.data["c_sound"]
+
     def get_density_in_radius(self, center, radius):
         """return the density in a sphere of radius around center"""
         assert len(center) == 3, "Center must be a 3D point"
@@ -365,8 +402,7 @@ class LeafsSnapshot:
             for j in range(self.gny):
                 for k in range(self.gnz):
                     # Ye = zbar / abar => zbar = Ye * abar
-                    # Use arbitrary abar = 16, only needed to recalculate Ye internally
-                    abar = 16
+                    abar = self.Amean[i, j, k]
                     zbar = abar * self.ye[i, j, k]
                     self.e_internal[i, j, k] = (
                         self.eos.InternalEnergyFromDensityTemperature(
