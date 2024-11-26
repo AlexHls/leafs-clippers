@@ -1542,7 +1542,7 @@ class LeafsProtocol:
 
         j = 99999  # Large number to find starting index of protocol files
         for filename in protocol_files:
-            j = min(j, int(filename.split(".")[0][-3:]))
+            j = min(j, int(filename[-9:-6]))
 
         filename = os.path.join(self.snappath, self.model + "%03d.bprot" % j)
         while os.path.exists(filename):
