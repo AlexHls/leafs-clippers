@@ -962,6 +962,8 @@ class LeafsSnapshot:
         plot_gl_color="black",
         mask=None,
         cax=None,
+        vmin=None,
+        vmax=None,
     ):
         """Plot a 2D slice through the simulation data, showing one particular
         quantity and, if desired, the location of the level set(s).
@@ -1031,6 +1033,13 @@ class LeafsSnapshot:
         cax : matplotlib.axes or None
             axes object into which the colorbar is placed; if None, the colorbar
             is placed into the same axes as the plot (default None)
+        vmin : float or None
+            minimum value displayed in the pcolormesh plot (goes into vmin).
+            Everything below will be clipped. If log is True, the logarithm
+            will be automatically calculated before handing it to pcolormesh.
+        vmax : float or None
+            analogous to Min but for the maximum value in the pcolormesh plot
+            (goes into vmax); default None
 
         Returns
         -------
@@ -1089,9 +1098,9 @@ class LeafsSnapshot:
                 pass
 
         if Min is None:
-            Min = np.min(Z)
+            Min = np.min(Z) if vmin is None else vmin
         if Max is None:
-            Max = np.max(Z)
+            Max = np.max(Z) if vmax is None else vmax
         if log:
             Z = np.log10(Z)
             Min = np.log10(Min)
@@ -1527,7 +1536,14 @@ class LeafsProtocol:
         self._read_protocol()
 
     def _read_protocol(self):
-        j = 0
+        protocol_files = glob.glob(os.path.join(self.snappath, self.model + "*.bprot"))
+        if len(protocol_files) == 0:
+            raise FileNotFoundError("No protocol files found.")
+
+        j = 99999  # Large number to find starting index of protocol files
+        for filename in protocol_files:
+            j = min(j, int(filename.split(".")[0][-3:]))
+
         filename = os.path.join(self.snappath, self.model + "%03d.bprot" % j)
         while os.path.exists(filename):
             f = open(filename, "rb")
