@@ -220,8 +220,6 @@ class NuclideChart:
 
         self.get_xiso(pnum=pnum, pnum_mask=pnum_mask)
 
-        print(self.xiso.shape)
-
         if ax is None:
             fig, ax = plt.subplots()
         else:
