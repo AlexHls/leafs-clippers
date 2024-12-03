@@ -134,10 +134,17 @@ def cli():
         help="Path to the directory containing the simulation. Default:'.'",
         default=".",
     )
+    parser.add_argument(
+        "-m",
+        "--model",
+        help="Model to use. Default:'one_def'",
+        default="one_def",
+    )
 
     args = parser.parse_args()
     main(
         path=args.path,
+        model=args.model,
     )
 
 
