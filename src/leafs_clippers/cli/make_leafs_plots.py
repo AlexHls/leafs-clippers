@@ -81,13 +81,21 @@ def make_plot(ind, snappath="output", model="one_def", ye_min=0.25, plotdir="plo
     plt.close()
 
 
-def main(path=".", model="one_def"):
+def main(path=".", model="one_def", simulation_type="ONeDef"):
     snappath = os.path.join(path, "output")
+
+    assert simulation_type in [
+        "CODef",
+        "ONeDef",
+        "HeDet",
+    ], "Unrecognized simulation type"
 
     if is_master():
         print("Reading protocol...")
     try:
-        lp = lc.LeafsProtocol(model=model, snappath=snappath)
+        lp = lc.LeafsProtocol(
+            model=model, snappath=snappath, simulation_type=simulation_type
+        )
         ye_min = np.min(lp.proto["min_ye"])
     except Exception as e:
         print(e)
@@ -140,11 +148,19 @@ def cli():
         help="Model to use. Default:'one_def'",
         default="one_def",
     )
+    parser.add_argument(
+        "-s",
+        "--simulation_type",
+        help="Simulation type. Default:'ONeDef'",
+        default="ONeDef",
+        choices=["ONeDef", "CODef", "HeDet"],
+    )
 
     args = parser.parse_args()
     main(
         path=args.path,
         model=args.model,
+        simulation_type=args.simulation_type,
     )
 
 
