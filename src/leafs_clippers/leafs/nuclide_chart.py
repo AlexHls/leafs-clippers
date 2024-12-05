@@ -78,7 +78,7 @@ class NuclideChart:
 
         return self.xiso
 
-    def map_xiso_to_grid(self, xiso, cutoff=1e-15, log=True):
+    def map_xiso_to_grid(self, xiso, cutoff=1e-15):
         """
         Map the xiso to a grid of n and z values
         """
@@ -94,12 +94,7 @@ class NuclideChart:
 
         # Apply threshold
         if cutoff is not None:
-            grid_ma = np.ma.masked_where(grid < cutoff, grid)
-            if log:
-                grid_ma = np.log10(grid_ma)
-            return grid_ma
-        if log:
-            grid = np.log10(grid)
+            grid = np.ma.masked_where(grid < cutoff, grid)
 
         return grid
 
@@ -204,7 +199,7 @@ class NuclideChart:
         cutoff=1e-15,
         max_n=70,
         max_z=70,
-        cmap="viridis",
+        cmap="Spectral_r",
         plot_network=True,
         network_lw=0.1,
         network_color="black",
@@ -213,6 +208,8 @@ class NuclideChart:
         pnum_mask=None,
         plot_magic_numbers=False,
         plot_stable_isotopes=False,
+        vmin=None,
+        vmax=None,
     ):
         """
         Plot the network nuclide chart
@@ -225,9 +222,22 @@ class NuclideChart:
         else:
             fig = ax.get_figure()
 
-        grid = self.map_xiso_to_grid(self.xiso, cutoff=cutoff, log=log)
+        grid = self.map_xiso_to_grid(self.xiso, cutoff=cutoff)
 
-        pcm = ax.pcolormesh(self.n_grid, self.z_grid, grid.T, cmap=cmap)
+        if log:
+            norm = "log"
+        else:
+            norm = "linear"
+
+        pcm = ax.pcolormesh(
+            self.n_grid,
+            self.z_grid,
+            grid.T,
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            norm=norm,
+        )
 
         if plot_network:
             self.draw_network(
@@ -240,15 +250,12 @@ class NuclideChart:
         if plot_stable_isotopes:
             self.plot_stable_isotopes(ax, network_lw * 2, network_color)
 
-        ax.set_xlim(0, max_n)
-        ax.set_ylim(0, max_z)
+        ax.set_xlim(-1, max_n)
+        ax.set_ylim(-1, max_z)
 
         # Add colorbar
         cbar = fig.colorbar(pcm, ax=ax)
-        if log:
-            cbar.set_label(r"$\log_{10}(X)$")
-        else:
-            cbar.set_label(r"$X$")
+        cbar.set_label(r"$X$")
 
         ax.set_xlabel("Number of neutrons")
         ax.set_ylabel("Number of protons")
