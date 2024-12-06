@@ -12,6 +12,10 @@ class ParticleXiso:
         self.z = z
         self._xiso = xiso
 
+        assert (
+            len(a) == len(z) == len(xiso[0, :])
+        ), f"Lengths of a({a.shape}), z({z.shape}), and xiso({xiso.shape}) do not match"
+
     def xiso(self, pnum=None):
         return self._xiso
 
@@ -26,8 +30,21 @@ class ParticleXiso:
 
 class ParticleTrajectory:
     def __init__(self, file, setup_file):
-        self.a, self.z = ParticleTrajectory.read_networksetup(setup_file)
+        self.a, self.z, self.network_isos = ParticleTrajectory.read_networksetup(
+            setup_file
+        )
         self.data = ParticleTrajectory.read_trajectory_output(file)
+
+        self.a, self.z = self._clean_isotopes()
+
+    def _clean_isotopes(self):
+        a_new = []
+        z_new = []
+        for i in range(len(self.data["iso_names"])):
+            if self.data["iso_names"][i] in self.network_isos:
+                a_new.append(self.a[self.network_isos.index(self.data["iso_names"][i])])
+                z_new.append(self.z[self.network_isos.index(self.data["iso_names"][i])])
+        return np.array(a_new), np.array(z_new)
 
     @classmethod
     def read_networksetup(self, file):
@@ -37,6 +54,7 @@ class ParticleTrajectory:
         lines = lines[5:]
         a = []
         z = []
+        iso_names = []
         for line in lines:
             if "*****" in line:
                 break
@@ -48,11 +66,22 @@ class ParticleTrajectory:
                 continue
             a.append(int(a_val[:-1]))
             z.append(int(z_val[:-1]))
+            name = line[15:20].rstrip()
+            iso_names.append(name.replace(" ", ""))
 
-        return np.array(a), np.array(z)
+        return np.array(a), np.array(z), iso_names
 
     @classmethod
     def read_trajectory_output(self, file):
+        iso_names = []
+        with open(file, "r") as f:
+            # Read only the first line
+            line = f.readline()
+        line = line[68:]
+        # Separate the string into 13 character long substrings and trim whitespace
+        for i in range(0, len(line), 13):
+            iso_names.append(line[i + 6 : i + 13].strip().replace(" ", ""))
+
         data = np.genfromtxt(file, skip_header=1)
         cycle = np.array(data[:, 0], dtype=int)
         time = data[:, 1]
@@ -62,6 +91,7 @@ class ParticleTrajectory:
         xnuc = data[:, 6:]
 
         return {
+            "iso_names": iso_names,
             "cycle": cycle,
             "time": time,
             "t9": t9,
