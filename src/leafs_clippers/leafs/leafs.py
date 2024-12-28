@@ -438,7 +438,7 @@ class LeafsSnapshot:
         return
 
     def get_bound_material(
-        self, include_internal_energy=True, eint_from_eos=False, vacuum_threshold=1e-5
+        self, include_internal_energy=True, eint_from_eos=False, vacuum_threshold=1e-4
     ):
         """
         Returns a boolean mask for the bound material.
