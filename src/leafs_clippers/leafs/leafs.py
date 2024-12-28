@@ -142,6 +142,7 @@ class LeafsSnapshot:
         helm_table="helm_table.dat",
         write_derived=True,
         ignore_cache=False,
+        remnant_threshold=1e4,
     ):
         """
         Read a LEAFS snapshot from an HDF5 file.
@@ -160,6 +161,9 @@ class LeafsSnapshot:
             quantities will be read from the cache file when available.
         ignore_cache : bool, optional
             If True, the cache file will be ignored and derived quantities will be recomputed.
+        remnant_threshold : float, optional
+            Threshold for what densities are considered to be part of the remnant.
+            This only makes sense for snapshots at around 100s post explosion.
         """
         self.quiet = quiet
         self.filename = filename
@@ -167,6 +171,7 @@ class LeafsSnapshot:
         self.helm_table = helm_table
         self.write_derived = write_derived
         self.ignore_cache = ignore_cache
+        self.remnant_threshold = remnant_threshold
 
         try:
             f = h5py.File(filename, "r")
@@ -236,6 +241,11 @@ class LeafsSnapshot:
     def mach(self):
         _ = self.get_mach()
         return self.data["mach"]
+
+    @property
+    def has_remnant(self):
+        (i,) = np.where(self.density > self.remnant_threshold)
+        return len(i) > 0
 
     def _load_derived(self, field):
         """
