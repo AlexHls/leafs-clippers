@@ -449,8 +449,33 @@ class LeafsSnapshot:
 
         return
 
+    def _get_remnant_velocity(self):
+        """
+        Get the velocity of the dense remnant.
+        """
+        if not self.has_remnant:
+            return 0.0, 0.0, 0.0
+
+        remnant_mask = self.density > self.remnant_threshold
+        remnant_mass = np.sum(self.mass[remnant_mask])
+        remnant_velx = (
+            np.sum(self.velx[remnant_mask] * self.mass[remnant_mask]) / remnant_mass
+        )
+        remnant_vely = (
+            np.sum(self.vely[remnant_mask] * self.mass[remnant_mask]) / remnant_mass
+        )
+        remnant_velz = (
+            np.sum(self.velz[remnant_mask] * self.mass[remnant_mask]) / remnant_mass
+        )
+
+        return remnant_velx, remnant_vely, remnant_velz
+
     def get_bound_material(
-        self, include_internal_energy=True, eint_from_eos=False, vacuum_threshold=1e-4
+        self,
+        include_internal_energy=True,
+        eint_from_eos=False,
+        vacuum_threshold=1e-4,
+        check_remnant=True,
     ):
         """
         Returns a boolean mask for the bound material.
@@ -460,6 +485,18 @@ class LeafsSnapshot:
         Bound material is defined as material with a negative
         total energy:
             E_kin + E_grav + E_int < 0
+
+        Parameters
+        ----------
+        include_internal_energy : bool, optional
+            If True, the internal energy is included in the bound criterion.
+        eint_from_eos : bool, optional
+            If True, the internal energy is computed from the EOS.
+        vacuum_threshold : float, optional
+            The threshold for densities to be considered vacuum.
+        check_remnant : bool, optional
+            If True, the velocity of the dense remnant is subtracted in the
+            bound criterion.
         """
 
         if not self.ignore_cache:
@@ -469,8 +506,18 @@ class LeafsSnapshot:
         if eint_from_eos:
             self.get_internal_energy_from_eos()
 
+        remnant_velx, remnant_vely, remnant_velz = 0.0, 0.0, 0.0
+        if check_remnant:
+            remnant_velx, remnant_vely, remnant_velz = self._get_remnant_velocity()
+
+        ekin = 0.5 * (
+            (self.velx - remnant_velx) ** 2
+            + (self.vely - remnant_vely) ** 2
+            + (self.velz - remnant_velz) ** 2
+        )
+
         # Note that quantities are stored per unit mass
-        total_energy = (self.egrav + self.ekin) * self.mass
+        total_energy = (self.egrav + ekin) * self.mass
         if include_internal_energy:
             if eint_from_eos:
                 total_energy += self.e_internal
@@ -486,7 +533,12 @@ class LeafsSnapshot:
         return self.data["bound_mask"]
 
     def get_bound_mass(
-        self, include_internal_energy=True, eint_from_eos=False, use_dmass=True
+        self,
+        include_internal_energy=True,
+        eint_from_eos=False,
+        use_dmass=True,
+        vacuum_threshold=1e-4,
+        check_remnant=True,
     ):
         """
         Returns the mass of the bound material.
@@ -499,14 +551,22 @@ class LeafsSnapshot:
         """
 
         bound_mask = self.get_bound_material(
-            include_internal_energy, eint_from_eos=eint_from_eos
+            include_internal_energy,
+            eint_from_eos=eint_from_eos,
+            vacuum_threshold=vacuum_threshold,
+            check_remnant=check_remnant,
         )
         if use_dmass:
             return np.sum(self.dmass[bound_mask])
         return np.sum(self.density[bound_mask] * self.vol[bound_mask])
 
     def get_kick_velocity(
-        self, include_internal_energy=True, eint_from_eos=False, return_dirs=False
+        self,
+        include_internal_energy=True,
+        eint_from_eos=False,
+        return_dirs=False,
+        check_remnant=True,
+        vacuum_threshold=1e-4,
     ):
         """
         Returns the kick velocity of the bound material.
@@ -516,10 +576,27 @@ class LeafsSnapshot:
         Bound material is defined as material with a negative
         total energy:
             E_kin + E_grav + E_int < 0
+
+        Parameters
+        ----------
+        include_internal_energy : bool, optional
+            If True, the internal energy is included in the bound criterion.
+        eint_from_eos : bool, optional
+            If True, the internal energy is computed from the EOS.
+        return_dirs : bool, optional
+            If True, the kick velocity components are returned.
+        check_remnant : bool, optional
+            If True, the velocity of the dense remnant is subtracted in the
+            bound criterion.
+        vacuum_threshold : float, optional
+            The threshold for densities to be considered vacuum.
         """
 
         bound_mask = self.get_bound_material(
-            include_internal_energy, eint_from_eos=eint_from_eos
+            include_internal_energy,
+            eint_from_eos=eint_from_eos,
+            vacuum_threshold=vacuum_threshold,
+            check_remnant=check_remnant,
         )
         vx = np.sum(
             (
