@@ -244,8 +244,10 @@ class LeafsSnapshot:
 
     @property
     def has_remnant(self):
-        (i,) = np.where(self.density > self.remnant_threshold)
-        return len(i) > 0
+        remnant_density = np.ma.masked_array(
+            self.density, mask=np.logical_not(self.density > self.remnant_threshold)
+        )
+        return len(remnant_density.compressed()) > 0
 
     def _load_derived(self, field):
         """
