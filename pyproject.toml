@@ -19,6 +19,7 @@ dynamic = ["version"]
 dependencies = [
     "numpy",
     "pandas",
+    "tqdm",
     "progressbar2",
     "mpi4py",
     "parallel_decorators@git+https://github.com/ohlmann/parallel_decorators",

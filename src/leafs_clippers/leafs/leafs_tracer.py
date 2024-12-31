@@ -2,6 +2,7 @@ import os
 import struct
 
 import numpy as np
+from tqdm import tqdm
 
 from leafs_clippers.util import utilities
 
@@ -29,6 +30,48 @@ def read_tracer(model, snappath="./", npart=0, file="", vartracer=True):
 
     """
     return LeafsTracer(model, snappath, npart, file, vartracer)
+
+
+def get_bound_unbound_ids(model="one_def", snappath="./output", ignore_cache=False):
+    if not ignore_cache:
+        try:
+            unbound = np.genfromtxt(f"{snappath}/unbound.txt", dtype=int)
+            bound = np.genfromtxt(f"{snappath}/bound.txt", dtype=int)
+            print("Found bound and unbound particles ids in output directory...")
+            return bound, unbound
+        except FileNotFoundError:
+            pass
+
+    print("Calculating bound and unbound particles ids...")
+
+    tp = read_tracer(model=model, snappath=snappath)
+    at = tp.loadalltracers()
+
+    bound = []
+    unbound = []
+    off = 8
+
+    for i in tqdm(range(tp.npart)):
+        idx = i + 1
+        eint = at.data[-1:i, 5]
+        egrav = at.data[-1, i, 7 + off]
+        ekin = 0.5 * (
+            at.data[-1, i, 9 + off] ** 2
+            + at.data[-1, i, 10 + off] ** 2
+            + at.data[-1, i, 11 + off] ** 2
+        )
+        etot = eint + egrav + ekin
+        if etot >= 0:
+            unbound.append(idx)
+        if etot < 0:
+            bound.append(idx)
+
+    np.savetxt(f"{snappath}/unbound.txt", unbound, fmt="%d")
+    np.savetxt(f"{snappath}/bound.txt", bound, fmt="%d")
+
+    print("All done.")
+
+    return np.array(bound), np.array(unbound)
 
 
 class LeafsTracer:
