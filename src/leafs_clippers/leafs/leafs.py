@@ -55,6 +55,7 @@ def readsnap(
     ignore_cache=False,
     helm_table="helm_table.dat",
     reduced_output=False,
+    remnant_threshold=1e4,
 ):
     file_base = "redo" if reduced_output else "o"
     if legacy:
@@ -73,6 +74,7 @@ def readsnap(
             helm_table="helm_table.dat",
             write_derived=write_derived,
             ignore_cache=ignore_cache,
+            remnant_threshold=remnant_threshold,
         )
 
 
