@@ -32,7 +32,13 @@ def read_tracer(model, snappath="./", npart=0, file="", vartracer=True):
     return LeafsTracer(model, snappath, npart, file, vartracer)
 
 
-def get_bound_unbound_ids(model="one_def", snappath="./output", ignore_cache=False):
+def get_bound_unbound_ids(
+    model="one_def",
+    snappath="./output",
+    ignore_cache=False,
+    remnant_velocity=[0, 0, 0],
+    writeout=True,
+):
     if not ignore_cache:
         try:
             unbound = np.genfromtxt(f"{snappath}/unbound.txt", dtype=int)
@@ -42,10 +48,12 @@ def get_bound_unbound_ids(model="one_def", snappath="./output", ignore_cache=Fal
         except FileNotFoundError:
             pass
 
+    rx, ry, rz = remnant_velocity
+
     print("Calculating bound and unbound particles ids...")
 
     tp = read_tracer(model=model, snappath=snappath)
-    at = tp.loadalltracers()
+    at = tp.last()
 
     bound = []
     unbound = []
@@ -53,12 +61,12 @@ def get_bound_unbound_ids(model="one_def", snappath="./output", ignore_cache=Fal
 
     for i in tqdm(range(tp.npart)):
         idx = i + 1
-        eint = at.data[-1:i, 5]
-        egrav = at.data[-1, i, 7 + off]
+        eint = at.data[5, i]
+        egrav = at.data[7 + off, i]
         ekin = 0.5 * (
-            at.data[-1, i, 9 + off] ** 2
-            + at.data[-1, i, 10 + off] ** 2
-            + at.data[-1, i, 11 + off] ** 2
+            (at.data[9 + off, i] - rx) ** 2
+            + (at.data[10 + off, i] - ry) ** 2
+            + (at.data[11 + off, i] - rz) ** 2
         )
         etot = eint + egrav + ekin
         if etot >= 0:
@@ -66,8 +74,9 @@ def get_bound_unbound_ids(model="one_def", snappath="./output", ignore_cache=Fal
         if etot < 0:
             bound.append(idx)
 
-    np.savetxt(f"{snappath}/unbound.txt", unbound, fmt="%d")
-    np.savetxt(f"{snappath}/bound.txt", bound, fmt="%d")
+    if writeout:
+        np.savetxt(f"{snappath}/unbound.txt", unbound, fmt="%d")
+        np.savetxt(f"{snappath}/bound.txt", bound, fmt="%d")
 
     print("All done.")
 
