@@ -676,7 +676,7 @@ class LeafsSnapshot:
             self.data[value][mid - 1 : mid + 2, mid - 1 : mid + 2, mid - 1 : mid + 2]
         )
 
-    def get_rad_profile(self, value, res=None, statistic="mean"):
+    def get_rad_profile(self, value, res=None, statistic="mean", max_radius=None):
         """
         Returns the (1D) radial averaged profile of a quantity.
         Uses binned_statistic to bin the data.
@@ -690,6 +690,8 @@ class LeafsSnapshot:
             The resolution to bin the data into.
         statistic : str, optional
             The statistic to compute in each bin. Passed to binned_statistic.
+        max_radius : float, optional
+            The maximum radius to consider.
 
         Returns
         -------
@@ -705,6 +707,11 @@ class LeafsSnapshot:
 
         r_flat = r.flatten()
         value_flat = self.data[value].flatten()
+
+        if max_radius is not None:
+            mask = r_flat < max_radius
+            r_flat = r_flat[mask]
+            value_flat = value_flat[mask]
 
         # Sort by radius
         idx = np.argsort(r_flat)
