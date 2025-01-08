@@ -49,6 +49,7 @@ packages = [
 "bin/clipper-ayann-tocsv" = "src/leafs_clippers/cli/ayann_tracer_to_csv.py"
 "bin/clipper-convert-tohdf5" = "src/leafs_clippers/cli/convert_leafs_to_hdf5.py"
 "bin/clipper-make-plots" = "src/leafs_clippers/cli/make_leafs_plots.py"
+"bin/clipper-leafs-to-artis" = "src/leafs_clippers/cli/map_leafs_to_artis.py"
 
 [tool.hatch.build.targets.wheel.force-include]
 #"bin/clipper-gen-inipos" = "src/leafs_clippers/cli/gen_inipos.py"
@@ -63,3 +64,4 @@ clipper-rewrite-tracer = "leafs_clippers.cli.rewrite_tracer:cli"
 clipper-ayann-tocsv = "leafs_clippers.cli.ayann_tracer_to_csv:cli"
 clipper-convert-tohdf5 = "leafs_clippers.cli.convert_leafs_to_hdf5:cli"
 clipper-make-plots = "leafs_clippers.cli.make_leafs_plots:cli"
+clipper-leafs-to-artis = "leafs_clippers.cli.map_leafs_to_artis:cli"
