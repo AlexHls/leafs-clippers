@@ -46,7 +46,7 @@ def read_1d_artis_model(root_dir=".", nradioactives=4, max_element=30):
         line = lines[i + 2].split()
         model["data"]["vel"][i] = float(line[1])
         logrho = float(line[2])
-        if logrho > 0:
+        if logrho != 0.0:
             model["data"]["rho"][i] = 10**logrho
         else:
             model["data"]["rho"][i] = 0.0
