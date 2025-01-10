@@ -6,6 +6,65 @@ from leafs_clippers.leafs import leafs_tracer as lt
 from leafs_clippers.util import const as const
 
 
+def read_1d_artis_model(root_dir=".", nradioactives=4, max_element=30):
+    """
+    Read the 1D ARTIS model from the given directory.
+
+    Parameters
+    ----------
+    root_dir : str, optional
+        The root directory. Default: ".".
+    nradioactives : int, optional
+        The number of radioactive isotopes. Default: 4.
+    max_element : int, optional
+        The maximum number of elements. Default: 30.
+
+    Returns
+    -------
+    dict
+        The ARTIS model.
+    """
+
+    model = {}
+    model["data"] = {}
+    model["abundances"] = {}
+    model["radioactives"] = []
+
+    with open(os.path.join(root_dir, "model_1D.txt"), "r") as f:
+        lines = f.readlines()
+
+    model["data"]["res"] = int(lines[0])
+    model["data"]["time"] = float(lines[1])
+
+    model["data"]["vel"] = np.zeros(model["data"]["res"])
+    model["data"]["rho"] = np.zeros(model["data"]["res"])
+    model["data"]["ige"] = np.zeros(model["data"]["res"])
+    model["data"]["radioactives"] = np.zeros((model["data"]["res"], nradioactives))
+    model["abundances"] = np.zeros((model["data"]["res"], max_element))
+
+    for i in range(model["data"]["res"]):
+        line = lines[i + 2].split()
+        model["data"]["vel"][i] = float(line[1])
+        logrho = float(line[2])
+        if logrho > 0:
+            model["data"]["rho"][i] = 10**logrho
+        else:
+            model["data"]["rho"][i] = 0.0
+        model["data"]["ige"][i] = float(line[3])
+        for j in range(nradioactives):
+            model["data"]["radioactives"][i, j] = float(line[4 + j])
+
+    with open(os.path.join(root_dir, "abundances_1D.txt"), "r") as f:
+        lines = f.readlines()
+
+    for i in range(model["data"]["res"]):
+        line = lines[i].split()
+        for j in range(max_element):
+            model["abundances"][i, j] = float(line[j + 1])
+
+    return model
+
+
 class MappingTracer:
     def __init__(
         self,
