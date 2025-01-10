@@ -727,9 +727,9 @@ class LeafsSnapshot:
         value_flat = self.data[value].flatten()
 
         if max_radius is not None:
-            max_radiuss = np.max(r_flat)
+            max_radius = np.max(r_flat)
 
-        assert min_radius < max_radiuss, "min_radius must be smaller than max_radius"
+        assert min_radius < max_radius, "min_radius must be smaller than max_radius"
 
         mask = np.logical_and(r_flat > min_radius, r_flat < max_radius)
         r_flat = r_flat[mask]
@@ -761,14 +761,17 @@ class LeafsSnapshot:
         # Otherwise 'sum' would be used in every case.
         bin_values, bin_edges, _ = (
             binned_statistic(r_sorted, value_sorted, bins=res, statistic=statistic)
-            / mass_binned
         )
+        bin_values /= mass_binned
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
         # Special case: for the density we recompute the density from the mass and volume
         if value == "density":
             assert not extensive, "Density is an intensive quantity"
             vol = 4 / 3 * np.pi * (bin_edges[1:] ** 3 - bin_edges[:-1] ** 3)
+            mass_binned, _, _ = binned_statistic(
+                r_sorted, mass_sorted, bins=res, statistic="sum"
+            )
             bin_values = mass_binned / vol
 
         return bin_centers, bin_values
