@@ -491,14 +491,14 @@ class LeafsMapping:
                 frho.write("%d %g %g " % (i + 1, vel[i], np.log10(shell_rho[i])))
             else:
                 frho.write("%d %g %g " % (i + 1, vel[i], 0.0))
-                text = format("%g" % shell_ige[i])
-                for j in range(len(radioactives)):
-                    text += format(" %g" % shell_rad[i, j])
-                frho.write(text + "\n")
-                abtext = format("%d" % (i + 1))
-                for j in range(self.max_element):
-                    abtext += format(" %g" % shell_abund[i, j + 1])
-                fabund.write(abtext + "\n")
+            text = format("%g" % shell_ige[i])
+            for j in range(len(radioactives)):
+                text += format(" %g" % shell_rad[i, j])
+            frho.write(text + "\n")
+            abtext = format("%d" % (i + 1))
+            for j in range(self.max_element):
+                abtext += format(" %g" % shell_abund[i, j + 1])
+            fabund.write(abtext + "\n")
 
         frho.close()
         fabund.close()
