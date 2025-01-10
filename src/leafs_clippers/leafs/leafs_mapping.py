@@ -25,6 +25,7 @@ class MappingTracer:
 
         # Needed attributes
         self.fpos = self._trajectory.posfin()
+        self.frad = np.sqrt(np.sum(self.fpos**2, axis=1))
         self.xiso = self._trajectory.xiso()
         self.isos = [self.convert_iso_string(s) for s in self._trajectory.isos]
         self.a = self._trajectory.a
@@ -152,7 +153,6 @@ class LeafsMapping:
             remnant_threshold=remnant_threshold,
         )
 
-        self.mapped3D = False
         self.rhointp = None
 
     def _guess_boxsize(self, max_vel=0):
@@ -460,12 +460,58 @@ class LeafsMapping:
 
         return
 
+    def _write_1D_grid(
+        self,
+        shell_rho,
+        shell_abund,
+        shell_iso,
+        shell_ige,
+        shell_rad,
+        vel,
+        nshells,
+        boxsize,
+        vacuum_threshold,
+        radioactives,
+        overwrite,
+    ):
+        if not overwrite:
+            if os.path.exists("model_1D.txt") or os.path.exists("abundances_1D.txt"):
+                raise ValueError(
+                    "Files already exist. Use overwrite=True to overwrite."
+                )
+        frho = open("model_1D.txt", "w")
+        fabund = open("abundances_1D.txt", "w")
+
+        frho.write("$d\n" % nshells)
+        frho.write("%g\n" % (self.s.time / (24.0 * 3600)))
+
+        for i in range(nshells):
+            if shell_rho[i] > 0:
+                frho.write("%d %g %g " % (i + 1, vel[i], np.log10(shell_rho[i])))
+            else:
+                frho.write("%d %g %g " % (i + 1, vel[i], 0.0))
+                text = format("%g" % shell_ige[i])
+                for j in range(len(radioactives)):
+                    text += format(" %g" % shell_rad[i, j])
+                frho.write(text + "\n")
+                abtext = format("%d" % (i + 1))
+                for j in range(self.max_element):
+                    abtext += format(" %g" % shell_abund[i, j + 1])
+                fabund.write(abtext + "\n")
+
+        frho.close()
+        fabund.close()
+
+        return
+
     def map1D(
         self,
         nshells=100,
         vacuum_threshold=1e-4,
         max_vel=0,
         radioactives=["ni56", "co56", "fe52", "cr48"],
+        write_files=True,
+        overwrite=False,
     ):
         """
         Map the TPPNP abundances to the LEAFS model in 1D.
@@ -480,10 +526,150 @@ class LeafsMapping:
             The maximum velocity to consider. Default: 0.
         radioactives : list, optional
             The list of radioactive isotopes to consider. Default: ["ni56", "co56", "fe52", "cr48"].
+        write_files : bool, optional
+            Write the ARTIS files. Default: True.
+        overwrite : bool, optional
+            Overwrite existing files. Default: False.
         """
 
-        if not self.mapped3D:
-            raise ValueError("3D mapping must be done first.")
+        self.boxsize = self._guess_boxsize(max_vel=max_vel)
+        if not self.quiet:
+            print("Calculating 1D mapping...")
+            print(f"Max radius: {0.5 * self.boxsize} cm.")
+            print(f"Number of shells: {nshells}.")
+            print(f"dr of shells: {self.boxsize / nshells} cm.")
+
+        dr = self.boxsize / nshells
+
+        shell_rho, _ = np.histogram(
+            self.tracers.frad,
+            bins=nshells,
+            range=[0, self.boxsize / 2],
+            weights=self.tracers.mass,
+        )
+        shell_rhoav, _ = np.histogram(
+            self.tracers.frad,
+            bins=nshells,
+            range=[0, self.boxsize / 2],
+            weights=self.tracers.rho,
+        )
+        shell_n, _ = np.histogram(
+            self.tracers.frad, bins=nshells, range=[0, self.boxsize / 2]
+        )
+
+        zm = int(max(self.tracer.z) + 1)
+        el = np.zeros([self.tracer.npart, zm])
+        shell_abund = np.zeros([nshells, zm])
+        for iz in range(zm):
+            el[:, iz] = self.tracer.xiso[:, self.tracer.z == iz].sum(axis=1)
+
+        for iz in range(zm):
+            shell_abund[:, iz], _ = np.histogram(
+                self.tracer.frad,
+                bins=nshells,
+                range=[0, self.boxsize / 2],
+                weights=el[:, iz] * self.tracer.mass,
+            )
+
+        shell_iso = np.zeros([nshells, len(self.tracer.isos)])
+        for iso in range(len(self.tracer.isos)):
+            shell_iso[:, iso], _ = np.histogram(
+                self.tracer.frad,
+                bins=nshells,
+                range=[0, self.boxsize / 2],
+                weights=self.tracer.xiso[:, iso] * self.tracer.mass,
+            )
+
+        shell_ige, _ = np.histogram(
+            self.tracer.frad,
+            bins=nshells,
+            range=[0, self.boxsize / 2],
+            weights=el[:, 21:].sum(axis=1) * self.tracer.mass,
+        )
+
+        shell_rad = np.zeros([nshells, len(radioactives)])
+        for i in range(len(radioactives)):
+            ispecies = self.tracer.isos.index(radioactives[i])
+            shell_rad[:, i], _ = np.histogram(
+                self.tracer.frad,
+                bins=nshells,
+                range=[0, self.boxsize / 2],
+                weights=self.tracer.xiso[:, ispecies] * self.tracer.mass,
+            )
+
+        if not self.quiet:
+            print(f"Lost mass: {self.tracer.mass.sum() - shell_rho.sum()}")
+            print(f"Lost tracers: {self.tracer.npart - shell_n.sum()}")
+
+        # Normalize
+        for i in range(self.nshells1D):
+            if shell_rho[i] > vacuum_threshold:
+                shell_abund[i, :] /= shell_rho[i]
+                shell_rad[i, :] /= shell_rho[i]
+                shell_iso[i, :] /= shell_rho[i]
+                shell_ige[i] /= shell_rho[i]
+                shell_rho[i] *= const.M_SOL / (
+                    4.0 / 3.0 * np.pi * dr**3 * ((i + 1) ** 3 - i**3)
+                )
+            else:
+                shell_abund[i, :] = 0.0
+                shell_iso[i, :] = 0.0
+                shell_ige[i] = 0.0
+                shell_rho[i] = 0.0
+
+        # Remove the bound core
+        bound_mask = self.s.get_bound_material(vacuum_threshold=vacuum_threshold)
+        xx, yy, zz = np.meshgrid(self.s.geomx, self.s.geomy, self.s.geomz)
+        rad = np.sqrt(xx**2 + yy**2 + zz**2)
+        rad_bound = np.max(rad[bound_mask])
+
+        _, shell_rhohydro = self.s.get_rad_profile(
+            "density", res=nshells, min_radius=rad_bound, max_radius=0.5 * self.boxsize
+        )
+        for i in range(nshells):
+            shell_rho[i] = shell_rhohydro[i]
+            if shell_rho[i] < vacuum_threshold:
+                shell_rho[i] = 0.0
+                shell_abund[i, :] = 0.0
+                shell_iso[i, :] = 0.0
+                shell_ige[i] = 0.0
+
+        # TODO Remove the bound core before this, otherwise this isn't going to work
+        mtot = self.tracer.mass.sum()
+        msum = 0.0
+        cutoff = nshells - 1
+        for i in range(nshells):
+            msum += shell_rho[i] * (4.0 / 3.0 * np.pi * dr**3 * ((i + 1) ** 3 - i**3))
+            if shell_n[i] == 0 and msum >= 0.95 * mtot:
+                cutoff = i
+                break
+
+        if not self.quiet:
+            print(f"Cutting profiles off at cell {cutoff}.")
+
+        shell_rho[cutoff:] = 0.0
+        shell_abund[cutoff:, :] = 0.0
+        shell_iso[cutoff:, :] = 0.0
+        shell_ige[cutoff:] = 0.0
+
+        vel = (np.arange(nshells) + 1) * dr / self.s.time / 1e5
+
+        # TODO: Implement concistency checks
+
+        if write_files:
+            self._write_1D_grid(
+                shell_rho,
+                shell_abund,
+                shell_iso,
+                shell_ige,
+                shell_rad,
+                vel,
+                nshells,
+                self.boxsize,
+                vacuum_threshold,
+                radioactives,
+                overwrite,
+            )
 
         return
 
