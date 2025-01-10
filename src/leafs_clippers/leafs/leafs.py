@@ -717,41 +717,49 @@ class LeafsSnapshot:
         """
         assert isinstance(value, str), "Value must be a string"
 
-        if extensive:
+        if extensive or (value == "density"):
+            # We treat densiyty as an extensive quantity since we only need
+            # to average the mass and recompute the density from that.
             statistic = "sum"
+            extensive = True
+
+        if res is None:
+            res = int(self.gnx // 2)
 
         xx, yy, zz = np.meshgrid(self.geomx, self.geomy, self.geomz)
         r = np.sqrt(xx**2 + yy**2 + zz**2)
 
         r_flat = r.flatten()
-        value_flat = self.data[value].flatten()
 
-        if max_radius is not None:
+        if max_radius is None:
             max_radius = np.max(r_flat)
 
         assert min_radius < max_radius, "min_radius must be smaller than max_radius"
-
         mask = np.logical_and(r_flat > min_radius, r_flat < max_radius)
         r_flat = r_flat[mask]
-        value_flat = value_flat[mask]
 
         # Sort by radius
         idx = np.argsort(r_flat)
         r_sorted = r_flat[idx]
-        value_sorted = value_flat[idx]
 
-        # Bin back into original resolution
-        if res is None:
-            res = int(self.gnx // 2)
-
-        if not extensive:
+        if not extensive or (value == "density"):
             mass_sorted = self.mass.flatten()[mask][idx]
-            mass_binned, _, _ = binned_statistic(
+            mass_binned, bin_edges, _ = binned_statistic(
                 r_sorted, mass_sorted, bins=res, statistic=statistic
             )
-            value_sorted *= mass_sorted
+            # Special case: for the density we recompute the density from the mass and volume
+            if value == "density":
+                vol = 4 / 3 * np.pi * (bin_edges[1:] ** 3 - bin_edges[:-1] ** 3)
+                bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+                bin_values = mass_binned / vol
+
+                return bin_centers, bin_values
         else:
+            mass_sorted = np.ones_like(r_sorted)
             mass_binned = np.ones(res)
+
+        value_flat = self.data[value].flatten()[mask]
+        value_sorted = value_flat[idx] * mass_sorted
 
         # Careful here: usually a weighted arithmetic mean is computed
         # as sum(value * weight) / sum(weight). Here we use
@@ -759,20 +767,11 @@ class LeafsSnapshot:
         # This is equivalent to the weighted arithmetic mean.
         # The reason for this is so we can also use the median as a statistic.
         # Otherwise 'sum' would be used in every case.
-        bin_values, bin_edges, _ = (
-            binned_statistic(r_sorted, value_sorted, bins=res, statistic=statistic)
+        bin_values, bin_edges, _ = binned_statistic(
+            r_sorted, value_sorted, bins=res, statistic=statistic
         )
         bin_values /= mass_binned
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-
-        # Special case: for the density we recompute the density from the mass and volume
-        if value == "density":
-            assert not extensive, "Density is an intensive quantity"
-            vol = 4 / 3 * np.pi * (bin_edges[1:] ** 3 - bin_edges[:-1] ** 3)
-            mass_binned, _, _ = binned_statistic(
-                r_sorted, mass_sorted, bins=res, statistic="sum"
-            )
-            bin_values = mass_binned / vol
 
         return bin_centers, bin_values
 
