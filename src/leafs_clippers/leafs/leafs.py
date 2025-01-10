@@ -677,7 +677,13 @@ class LeafsSnapshot:
         )
 
     def get_rad_profile(
-        self, value, res=None, statistic="mean", min_radius=0, max_radius=None
+        self,
+        value,
+        res=None,
+        statistic="mean",
+        extensive=False,
+        min_radius=0,
+        max_radius=None,
     ):
         """
         Returns the (1D) radial averaged profile of a quantity.
@@ -687,11 +693,16 @@ class LeafsSnapshot:
         Parameters
         ----------
         value : str
-            The name of the quantity to bin.
+            The name of the quantity to bin. If value == "density", the density
+            will be computed from the mass and volume of each bin.
         res : int, optional
             The resolution to bin the data into.
         statistic : str, optional
             The statistic to compute in each bin. Passed to binned_statistic.
+        extensive : bool, optional
+            If True, the quantity is treated as extensive. This sets the
+            statistic to 'sum'. Intensive quantities will be weighted by the
+            mass of each cell.
         min_radius : float, optional
             The minimum radius to consider.
         max_radius : float, optional
@@ -706,6 +717,9 @@ class LeafsSnapshot:
         """
         assert isinstance(value, str), "Value must be a string"
 
+        if extensive:
+            statistic = "sum"
+
         xx, yy, zz = np.meshgrid(self.geomx, self.geomy, self.geomz)
         r = np.sqrt(xx**2 + yy**2 + zz**2)
 
@@ -714,6 +728,8 @@ class LeafsSnapshot:
 
         if max_radius is not None:
             max_radiuss = np.max(r_flat)
+
+        assert min_radius < max_radiuss, "min_radius must be smaller than max_radius"
 
         mask = np.logical_and(r_flat > min_radius, r_flat < max_radius)
         r_flat = r_flat[mask]
@@ -726,12 +742,34 @@ class LeafsSnapshot:
 
         # Bin back into original resolution
         if res is None:
-            res = len(self.geomx) // 2
+            res = int(self.gnx // 2)
 
-        bin_values, bin_edges, _ = binned_statistic(
-            r_sorted, value_sorted, bins=res, statistic=statistic
+        if not extensive:
+            mass_sorted = self.mass.flatten()[mask][idx]
+            mass_binned, _, _ = binned_statistic(
+                r_sorted, mass_sorted, bins=res, statistic=statistic
+            )
+            value_sorted *= mass_sorted
+        else:
+            mass_binned = np.ones(res)
+
+        # Careful here: usually a weighted arithmetic mean is computed
+        # as sum(value * weight) / sum(weight). Here we use
+        # 1/n * sum(value * weight) / (1/n * sum(weight)) = sum(value * weight) / sum(weight)
+        # This is equivalent to the weighted arithmetic mean.
+        # The reason for this is so we can also use the median as a statistic.
+        # Otherwise 'sum' would be used in every case.
+        bin_values, bin_edges, _ = (
+            binned_statistic(r_sorted, value_sorted, bins=res, statistic=statistic)
+            / mass_binned
         )
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+        # Special case: for the density we recompute the density from the mass and volume
+        if value == "density":
+            assert not extensive, "Density is an intensive quantity"
+            vol = 4 / 3 * np.pi * (bin_edges[1:] ** 3 - bin_edges[:-1] ** 3)
+            bin_values = mass_binned / vol
 
         return bin_centers, bin_values
 
