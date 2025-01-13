@@ -1,9 +1,11 @@
 import os
 import numpy as np
+from scipy.stats import binned_statistic
 
 from leafs_clippers.leafs import leafs as lc
 from leafs_clippers.leafs import leafs_tracer as lt
 from leafs_clippers.util import const as const
+from leafs_clippers.util import utilities as util
 
 
 def read_1d_artis_model(root_dir=".", nradioactives=4, max_element=30):
@@ -223,7 +225,7 @@ class LeafsMapping:
 
         if not self.quiet:
             print(
-                f"Boxsize is {boxsize:e}cm, equivalent to {boxsize/self.s.time / 1e5 / 2:.2f} km/s"
+                f"Boxsize is {boxsize:e}cm, equivalent to {boxsize / self.s.time / 1e5 / 2:.2f} km/s"
             )
 
         return boxsize
@@ -334,7 +336,7 @@ class LeafsMapping:
         if not self.quiet:
             print("Done.")
             print(
-                f"Rhointp, min={rhointp.min()}, max={rhointp.max()}, av={rhointp.sum()/res**3}, totmass={rhointp.sum()*self.boxsize**3/res**3/const.M_SOL}"
+                f"Rhointp, min={rhointp.min()}, max={rhointp.max()}, av={rhointp.sum() / res**3}, totmass={rhointp.sum() * self.boxsize**3 / res**3 / const.M_SOL}"
             )
 
         return rhointp
@@ -527,7 +529,7 @@ class LeafsMapping:
         shell_iso,
         shell_ige,
         shell_rad,
-        vel,
+        shell_vel,
         res,
         boxsize,
         vacuum_threshold,
@@ -547,9 +549,9 @@ class LeafsMapping:
 
         for i in range(res):
             if shell_rho[i] > 0:
-                frho.write("%d %g %g " % (i + 1, vel[i], np.log10(shell_rho[i])))
+                frho.write("%d %g %g " % (i + 1, shell_vel[i], np.log10(shell_rho[i])))
             else:
-                frho.write("%d %g %g " % (i + 1, vel[i], 0.0))
+                frho.write("%d %g %g " % (i + 1, shell_vel[i], 0.0))
             text = format("%g" % shell_ige[i])
             for j in range(len(radioactives)):
                 text += format(" %g" % shell_rad[i, j])
@@ -593,89 +595,6 @@ class LeafsMapping:
         """
 
         self.boxsize = self._guess_boxsize(max_vel=max_vel)
-        if not self.quiet:
-            print("Calculating 1D mapping...")
-            print(f"Max radius: {0.5 * self.boxsize} cm.")
-            print(f"Number of shells: {res}.")
-            print(f"dr of shells: {self.boxsize / res} cm.")
-
-        dr = self.boxsize / res
-
-        shell_rho, _ = np.histogram(
-            self.tracer.frad,
-            bins=res,
-            range=[0, self.boxsize / 2],
-            weights=self.tracer.mass,
-        )
-        shell_rhoav, _ = np.histogram(
-            self.tracer.frad,
-            bins=res,
-            range=[0, self.boxsize / 2],
-            weights=self.tracer.rho,
-        )
-        shell_n, _ = np.histogram(
-            self.tracer.frad, bins=res, range=[0, self.boxsize / 2]
-        )
-
-        zm = int(max(self.tracer.z) + 1)
-        el = np.zeros([self.tracer.npart, zm])
-        shell_abund = np.zeros([res, zm])
-        for iz in range(zm):
-            el[:, iz] = self.tracer.xiso[:, self.tracer.z == iz].sum(axis=1)
-
-        for iz in range(zm):
-            shell_abund[:, iz], _ = np.histogram(
-                self.tracer.frad,
-                bins=res,
-                range=[0, self.boxsize / 2],
-                weights=el[:, iz] * self.tracer.mass,
-            )
-
-        shell_iso = np.zeros([res, len(self.tracer.isos)])
-        for iso in range(len(self.tracer.isos)):
-            shell_iso[:, iso], _ = np.histogram(
-                self.tracer.frad,
-                bins=res,
-                range=[0, self.boxsize / 2],
-                weights=self.tracer.xiso[:, iso] * self.tracer.mass,
-            )
-
-        shell_ige, _ = np.histogram(
-            self.tracer.frad,
-            bins=res,
-            range=[0, self.boxsize / 2],
-            weights=el[:, 21:].sum(axis=1) * self.tracer.mass,
-        )
-
-        shell_rad = np.zeros([res, len(radioactives)])
-        for i in range(len(radioactives)):
-            ispecies = self.tracer.isos.index(radioactives[i])
-            shell_rad[:, i], _ = np.histogram(
-                self.tracer.frad,
-                bins=res,
-                range=[0, self.boxsize / 2],
-                weights=self.tracer.xiso[:, ispecies] * self.tracer.mass,
-            )
-
-        if not self.quiet:
-            print(f"Lost mass: {self.tracer.mass.sum() - shell_rho.sum()}")
-            print(f"Lost tracers: {self.tracer.npart - shell_n.sum()}")
-
-        # Normalize
-        for i in range(res):
-            if shell_rho[i] > vacuum_threshold:
-                shell_abund[i, :] /= shell_rho[i]
-                shell_rad[i, :] /= shell_rho[i]
-                shell_iso[i, :] /= shell_rho[i]
-                shell_ige[i] /= shell_rho[i]
-                shell_rho[i] *= const.M_SOL / (
-                    4.0 / 3.0 * np.pi * dr**3 * ((i + 1) ** 3 - i**3)
-                )
-            else:
-                shell_abund[i, :] = 0.0
-                shell_iso[i, :] = 0.0
-                shell_ige[i] = 0.0
-                shell_rho[i] = 0.0
 
         # Remove the bound core
         bound_mask = self.s.get_bound_material(vacuum_threshold=vacuum_threshold)
@@ -683,23 +602,94 @@ class LeafsMapping:
         rad = np.sqrt(xx**2 + yy**2 + zz**2)
         rad_bound = np.max(rad[bound_mask])
 
-        _, shell_rhohydro = self.s.get_rad_profile(
-            "density", res=res, min_radius=rad_bound, max_radius=0.5 * self.boxsize
+        if not self.quiet:
+            print("Calculating 1D mapping...")
+            print(f"Max radius: {0.5 * self.boxsize} cm.")
+            print(f"Min radius: {rad_bound} cm.")
+            print(f"Number of shells: {res}.")
+            print(f"dr of shells: {0.5 * self.boxsize / res} cm.")
+
+        shell_n, _ = np.histogram(
+            self.tracer.frad, bins=res, range=[rad_bound, self.boxsize / 2]
         )
+
+        zm = int(max(self.tracer.z) + 1)
+        el = np.zeros(
+            [self.tracer.npart, zm]
+        )  # Sum gets the number of True elements in the mask
+        shell_abund = np.zeros([res, zm])
+        for iz in range(zm):
+            el[:, iz] = self.tracer.xiso[:, self.tracer.z == iz].sum(axis=1)
+
+        for iz in range(zm):
+            shell_abund[:, iz], _, _ = util.binned_statistic_weighted(
+                self.tracer.frad,
+                el[:, iz],
+                self.tracer.mass,
+                bins=res,
+                range=[rad_bound, self.boxsize / 2],
+                statistic="sum",
+            )
+
+        shell_iso = np.zeros([res, len(self.tracer.isos)])
+        for iso in range(len(self.tracer.isos)):
+            shell_iso[:, iso], _, _ = util.binned_statistic_weighted(
+                self.tracer.frad,
+                self.tracer.xiso[:, iso],
+                self.tracer.mass,
+                bins=res,
+                range=[rad_bound, self.boxsize / 2],
+                statistic="sum",
+            )
+
+        shell_ige, _, _ = util.binned_statistic_weighted(
+            self.tracer.frad,
+            el[:, 21:].sum(axis=1),
+            self.tracer.mass,
+            bins=res,
+            range=[rad_bound, self.boxsize / 2],
+            statistic="sum",
+        )
+
+        shell_rad = np.zeros([res, len(radioactives)])
+        for i in range(len(radioactives)):
+            ispecies = self.tracer.isos.index(radioactives[i])
+            shell_rad[:, i], _, _ = util.binned_statistic_weighted(
+                self.tracer.frad,
+                self.tracer.xiso[:, ispecies],
+                self.tracer.mass,
+                bins=res,
+                range=[rad_bound, self.boxsize / 2],
+                statistic="sum",
+            )
+
+        shell_radius, shell_rho, shell_edges = self.s.get_rad_profile(
+            "density",
+            res=res,
+            min_radius=rad_bound,
+            max_radius=0.5 * self.boxsize,
+            return_edges=True,
+        )
+
+        if not self.quiet:
+            print(f"Lost mass: {self.tracer.mass.sum() - shell_rho.sum()}")
+            print(f"Lost tracers: {self.tracer.npart - shell_n.sum()}")
+
         for i in range(res):
-            shell_rho[i] = shell_rhohydro[i]
-            if shell_rho[i] < vacuum_threshold:
-                shell_rho[i] = 0.0
+            if shell_rho[i] <= vacuum_threshold:
                 shell_abund[i, :] = 0.0
                 shell_iso[i, :] = 0.0
                 shell_ige[i] = 0.0
+                shell_rad[i, :] = 0.0
+                shell_rho[i] = 0.0
 
-        # TODO Remove the bound core before this, otherwise this isn't going to work
         mtot = self.tracer.mass.sum()
         msum = 0.0
         cutoff = res - 1
         for i in range(res):
-            msum += shell_rho[i] * (4.0 / 3.0 * np.pi * dr**3 * ((i + 1) ** 3 - i**3))
+            msum += shell_rho[i] * (
+                4.0 / 3.0 * np.pi * (shell_edges[i + 1] ** 3 - shell_edges[i] ** 3)
+            )
             if shell_n[i] == 0 and msum >= 0.95 * mtot:
                 cutoff = i
                 break
@@ -712,7 +702,13 @@ class LeafsMapping:
         shell_iso[cutoff:, :] = 0.0
         shell_ige[cutoff:] = 0.0
 
-        vel = (np.arange(res) + 1) * dr / self.s.time / 1e5
+        shell_vel = shell_radius / self.s.time / 1e5
+
+        self.shell_rho = shell_rho
+        self.shell_abund = shell_abund
+        self.shell_iso = shell_iso
+        self.shell_ige = shell_ige
+        self.shell_vel = shell_vel
 
         # TODO: Implement concistency checks
 
@@ -723,7 +719,7 @@ class LeafsMapping:
                 shell_iso,
                 shell_ige,
                 shell_rad,
-                vel,
+                shell_vel,
                 res,
                 self.boxsize,
                 vacuum_threshold,

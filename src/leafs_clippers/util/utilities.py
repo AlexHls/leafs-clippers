@@ -62,11 +62,20 @@ def binned_statistic_weighted(
         This assigns to each element of `x` an integer that represents the bin in
         which this element falls.
     """
+    x = np.asarray(x)
+    values = np.asarray(values)
+    weights = np.asarray(weights)
+
+    assert values.shape == weights.shape, "values and weights must have the same shape"
+
     weighted_values = values * weights
     statistic, bin_edges, binnumber = binned_statistic(
         x, weighted_values, statistic=statistic, bins=bins, range=range
     )
-    weighted_statistic = statistic / weights
+    weight_binned, _, _ = binned_statistic(
+        x, weights, statistic="sum", bins=bins, range=range
+    )
+    weighted_statistic = statistic / weight_binned
 
     return weighted_statistic, bin_edges, binnumber
 

@@ -740,7 +740,7 @@ class LeafsSnapshot:
 
         assert min_radius < max_radius, "min_radius must be smaller than max_radius"
 
-        if not extensive or (value == "density"):
+        if (not extensive) or (value == "density"):
             mass_flat = self.mass.flatten()
             mass_binned, bin_edges, _ = binned_statistic(
                 r_flat,
