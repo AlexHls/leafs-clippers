@@ -679,7 +679,7 @@ class LeafsSnapshot:
         self,
         value,
         res=None,
-        statistic="mean",
+        statistic="sum",
         extensive=False,
         min_radius=0,
         max_radius=None,
@@ -722,7 +722,7 @@ class LeafsSnapshot:
         assert isinstance(value, str), "Value must be a string"
 
         if extensive or (value == "density"):
-            # We treat densiyty as an extensive quantity since we only need
+            # We treat density as an extensive quantity since we only need
             # to average the mass and recompute the density from that.
             statistic = "sum"
             extensive = True
@@ -734,6 +734,7 @@ class LeafsSnapshot:
         r = np.sqrt(xx**2 + yy**2 + zz**2)
 
         r_flat = r.flatten()
+        value_flat = self.data[value].flatten()
 
         if max_radius is None:
             max_radius = np.max(r_flat)
@@ -741,43 +742,47 @@ class LeafsSnapshot:
         assert min_radius < max_radius, "min_radius must be smaller than max_radius"
 
         if (not extensive) or (value == "density"):
+            # Careful here: usually a weighted arithmetic mean is computed
+            # as sum(value * weight) / sum(weight). Here we use
+            # 1/n * sum(value * weight) / (1/n * sum(weight)) = sum(value * weight) / sum(weight)
+            # This is equivalent to the weighted arithmetic mean.
+            # The reason for this is so we can also use the median as a statistic.
+            # Otherwise 'sum' would be used in every case.
             mass_flat = self.mass.flatten()
-            mass_binned, bin_edges, _ = binned_statistic(
+            bin_values, bin_edges, _ = util.binned_statistic_weighted(
                 r_flat,
-                mass_flat,
+                value_flat,
+                weights=mass_flat,
                 bins=res,
                 statistic=statistic,
                 range=(min_radius, max_radius),
             )
             # Special case: for the density we recompute the density from the mass and volume
             if value == "density":
+                mass_binned, _, _ = binned_statistic(
+                    r_flat,
+                    mass_flat,
+                    bins=res,
+                    statistic="sum",
+                    range=(min_radius, max_radius),
+                )
                 vol = 4 / 3 * np.pi * (bin_edges[1:] ** 3 - bin_edges[:-1] ** 3)
                 bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
                 bin_values = mass_binned / vol
 
                 if return_edges:
                     return bin_centers, bin_values, bin_edges
+
                 return bin_centers, bin_values
         else:
-            mass_flat = np.ones_like(r_flat)
-            mass_binned = np.ones(res)
+            bin_values, bin_edges, _ = binned_statistic(
+                r_flat,
+                value_flat,
+                bins=res,
+                statistic=statistic,
+                range=(min_radius, max_radius),
+            )
 
-        value_flat = self.data[value].flatten()
-
-        # Careful here: usually a weighted arithmetic mean is computed
-        # as sum(value * weight) / sum(weight). Here we use
-        # 1/n * sum(value * weight) / (1/n * sum(weight)) = sum(value * weight) / sum(weight)
-        # This is equivalent to the weighted arithmetic mean.
-        # The reason for this is so we can also use the median as a statistic.
-        # Otherwise 'sum' would be used in every case.
-        bin_values, bin_edges, _ = util.binned_statistic_weighted(
-            r_flat,
-            value_flat,
-            weights=mass_flat,
-            bins=res,
-            statistic=statistic,
-            range=(min_radius, max_radius),
-        )
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
         if return_edges:

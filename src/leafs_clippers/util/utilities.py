@@ -69,13 +69,13 @@ def binned_statistic_weighted(
     assert values.shape == weights.shape, "values and weights must have the same shape"
 
     weighted_values = values * weights
-    statistic, bin_edges, binnumber = binned_statistic(
+    binned_values, bin_edges, binnumber = binned_statistic(
         x, weighted_values, statistic=statistic, bins=bins, range=range
     )
     weight_binned, _, _ = binned_statistic(
-        x, weights, statistic="sum", bins=bins, range=range
+        x, weights, statistic=statistic, bins=bins, range=range
     )
-    weighted_statistic = statistic / weight_binned
+    weighted_statistic = binned_values / weight_binned
 
     return weighted_statistic, bin_edges, binnumber
 
