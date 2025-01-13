@@ -294,8 +294,7 @@ class LeafsSnapshot:
                     f[field][...] = self.data[field]
         except PermissionError:
             print(
-                f"No permission to write in snapshot directory,"
-                f" {field} not cached..."
+                f"No permission to write in snapshot directory, {field} not cached..."
             )
 
         return
@@ -684,6 +683,7 @@ class LeafsSnapshot:
         extensive=False,
         min_radius=0,
         max_radius=None,
+        return_edges=False,
     ):
         """
         Returns the (1D) radial averaged profile of a quantity.
@@ -707,6 +707,8 @@ class LeafsSnapshot:
             The minimum radius to consider.
         max_radius : float, optional
             The maximum radius to consider.
+        return_edges : bool, optional
+            If True, the bin edges are returned as well.
 
         Returns
         -------
@@ -714,6 +716,8 @@ class LeafsSnapshot:
             The bin centers.
         bin_values : np.ndarray
             The binned values.
+        bin_edges : np.ndarray
+            The bin edges (if return_edges is True).
         """
         assert isinstance(value, str), "Value must be a string"
 
@@ -735,17 +739,15 @@ class LeafsSnapshot:
             max_radius = np.max(r_flat)
 
         assert min_radius < max_radius, "min_radius must be smaller than max_radius"
-        mask = np.logical_and(r_flat > min_radius, r_flat < max_radius)
-        r_flat = r_flat[mask]
-
-        # Sort by radius
-        idx = np.argsort(r_flat)
-        r_sorted = r_flat[idx]
 
         if not extensive or (value == "density"):
-            mass_sorted = self.mass.flatten()[mask][idx]
+            mass_flat = self.mass.flatten()
             mass_binned, bin_edges, _ = binned_statistic(
-                r_sorted, mass_sorted, bins=res, statistic=statistic
+                r_flat,
+                mass_flat,
+                bins=res,
+                statistic=statistic,
+                range=(min_radius, max_radius),
             )
             # Special case: for the density we recompute the density from the mass and volume
             if value == "density":
@@ -753,13 +755,14 @@ class LeafsSnapshot:
                 bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
                 bin_values = mass_binned / vol
 
+                if return_edges:
+                    return bin_centers, bin_values, bin_edges
                 return bin_centers, bin_values
         else:
-            mass_sorted = np.ones_like(r_sorted)
+            mass_flat = np.ones_like(r_flat)
             mass_binned = np.ones(res)
 
-        value_flat = self.data[value].flatten()[mask]
-        value_sorted = value_flat[idx] * mass_sorted
+        value_flat = self.data[value].flatten()
 
         # Careful here: usually a weighted arithmetic mean is computed
         # as sum(value * weight) / sum(weight). Here we use
@@ -767,11 +770,18 @@ class LeafsSnapshot:
         # This is equivalent to the weighted arithmetic mean.
         # The reason for this is so we can also use the median as a statistic.
         # Otherwise 'sum' would be used in every case.
-        bin_values, bin_edges, _ = binned_statistic(
-            r_sorted, value_sorted, bins=res, statistic=statistic
+        bin_values, bin_edges, _ = util.binned_statistic_weighted(
+            r_flat,
+            value_flat,
+            weights=mass_flat,
+            bins=res,
+            statistic=statistic,
+            range=(min_radius, max_radius),
         )
-        bin_values /= mass_binned
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+        if return_edges:
+            return bin_centers, bin_values, bin_edges
 
         return bin_centers, bin_values
 

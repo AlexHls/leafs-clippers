@@ -5,6 +5,7 @@ import pylab
 import numpy as np
 import pandas as pd
 from matplotlib.ticker import ScalarFormatter
+from scipy.stats import binned_statistic
 
 
 class anyobject:
@@ -26,6 +27,48 @@ def obj2dict(obj):
         d[key] = obj.__dict__[key]
 
     return d
+
+
+def binned_statistic_weighted(
+    x, values, weights, statistic="mean", bins=10, range=None
+):
+    """
+    Compute a weighted binned statistic for one or more sets of data, applying
+    weights to each value. Wrapper around `scipy.stats.binned_statistic`.
+    All arguments except `weights` are passed to `scipy.stats.binned_statistic`.
+
+    Parameters
+    ----------
+    x : array_like
+        A sequence of values to be binned.
+    values : array_like
+        The main data values for each statistic.
+    weights : array_like
+        The weight for each value.
+    statistic : string or callable, optional
+        The statistic to compute (default is 'mean').
+    bins : int or sequence of scalars, optional
+        The number of bins to use, or the bin edges.
+    range : sequence, optional
+        A 2-element sequence giving the lower and upper range of the bins.
+
+    Returns
+    -------
+    statistic : array
+        The values of the selected statistic in each bin.
+    bin_edges : array of dtype float
+        Return the edges of the bins.
+    binnumber : array of dtype int
+        This assigns to each element of `x` an integer that represents the bin in
+        which this element falls.
+    """
+    weighted_values = values * weights
+    statistic, bin_edges, binnumber = binned_statistic(
+        x, weighted_values, statistic=statistic, bins=bins, range=range
+    )
+    weighted_statistic = statistic / weights
+
+    return weighted_statistic, bin_edges, binnumber
 
 
 def get_abar_zbar(xnuc, species):
