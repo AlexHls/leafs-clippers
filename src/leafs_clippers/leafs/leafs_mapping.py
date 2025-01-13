@@ -794,7 +794,7 @@ class LeafsMapping:
             self.tracer.fpos[ttt],
             self.tracer.mass[ttt] * const.M_SOL,
             self.tracer.rho[ttt],
-            self.tracer.xisos[ttt],
+            self.tracer.xiso[ttt],
             nneighbours,
             res,
             res,
