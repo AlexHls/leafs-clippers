@@ -196,7 +196,7 @@ class LeafsMapping:
         self.max_element = max_element
 
         self.traj = t.particle_set()
-        self.traj.load_final_abundances(tppnppath)
+        self.traj.load_final_abundances(tppnppath, sort=True)
 
         snaps = lc.get_snaplist(snappath=snappath, model=model)
         self.s = lc.readsnap(
