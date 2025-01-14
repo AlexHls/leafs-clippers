@@ -37,6 +37,8 @@ def get_bound_unbound_ids(
     snappath="./output",
     ignore_cache=False,
     remnant_velocity=[0, 0, 0],
+    qn=6,
+    nlset=1,
     writeout=True,
 ):
     if not ignore_cache:
@@ -57,16 +59,16 @@ def get_bound_unbound_ids(
 
     bound = []
     unbound = []
-    off = 8
+    off = 1 + 6 + qn + 2 * nlset
 
     for i in tqdm(range(tp.npart)):
         idx = i + 1
         eint = at.data[5, i]
-        egrav = at.data[7 + off, i]
+        egrav = at.data[off, i]
         ekin = 0.5 * (
-            (at.data[9 + off, i] - rx) ** 2
-            + (at.data[10 + off, i] - ry) ** 2
-            + (at.data[11 + off, i] - rz) ** 2
+            (at.data[off + 1, i] - rx) ** 2
+            + (at.data[off + 2, i] - ry) ** 2
+            + (at.data[off + 3, i] - rz) ** 2
         )
         etot = eint + egrav + ekin
         if etot >= 0:
@@ -407,9 +409,9 @@ class LeafsTracer:
             )
         if chunksize != self.npart and chunksize is not None:
             assert threed, "Chunking only works in 3D!"
-            assert (
-                chunksize + read_count <= self.npart
-            ), "Chunsize bigger than number of particles!"
+            assert chunksize + read_count <= self.npart, (
+                "Chunsize bigger than number of particles!"
+            )
             data = np.zeros((chunksize, 6))
             offset = f.tell()
             for i in range(6):
@@ -431,10 +433,10 @@ class LeafsTracer:
         if len(timeoffsets) == 0:
             timeoffsets = np.zeros(self.nfiles)
         else:
-            assert (
-                len(timeoffsets) != self.nfiles
-            ), "timeoffsets {0} has to be of the same size as the number of files {1}.".format(
-                len(timeoffsets), self.nfiles
+            assert len(timeoffsets) != self.nfiles, (
+                "timeoffsets {0} has to be of the same size as the number of files {1}.".format(
+                    len(timeoffsets), self.nfiles
+                )
             )
 
         if not outname:
