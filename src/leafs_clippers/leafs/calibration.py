@@ -24,11 +24,15 @@ def write_burn_table(filename, rho, abunds):
     for elem in abunds:
         abunds[elem] = [x for _, x in sorted(zip(rho, abunds[elem]), reverse=True)]
 
-    abunds_vstack = np.vstack([abunds[elem] for elem in abunds])
+    data = {"rho": rho_bins}
+    data.update(abunds)
 
     with FortranFile(filename, "w") as f:
         f.write_record(np.array([dtablnr]))
-        f.write_record(rho_bins)
-        f.write_record(abunds_vstack.astype(np.float64))
+        f.write_record(
+            np.vstack([data["rho"], *[data[elem] for elem in abunds]]).astype(
+                np.float64
+            )
+        )
 
     return
