@@ -21,12 +21,14 @@ def write_burn_table(filename, rho, abunds):
 
     # Sort density in descending order
     rho_bins = np.sort(rho)[::-1]
+    for elem in abunds:
+        abunds[elem] = [x for _, x in sorted(zip(rho, abunds[elem]), reverse=True)]
+
+    abunds_vstack = np.vstack([abunds[elem] for elem in abunds])
+
     with FortranFile(filename, "w") as f:
         f.write_record(np.array([dtablnr]))
         f.write_record(rho_bins)
-        for elem in abunds:
-            # Sort abundances in descending order based on Density
-            xfrac = [x for _, x in sorted(zip(rho, abunds[elem]), reverse=True)]
-            f.write_record(np.array(xfrac, dtype=np.float64))
+        f.write_record(abunds_vstack.astype(np.float64))
 
     return
