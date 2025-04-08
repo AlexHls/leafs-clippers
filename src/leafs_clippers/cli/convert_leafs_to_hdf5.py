@@ -133,6 +133,13 @@ def cli():
         action="store_true",
         help="Use reduced output files",
     )
+    parser.add_argument(
+        "--subgrid_size",
+        type=int,
+        nargs=3,
+        default=(64, 64, 64),
+        help="Size of the individual mesh blocks in the XDMF files",
+    )
 
     args = parser.parse_args()
     main(
@@ -145,6 +152,7 @@ def cli():
         big_endian=args.big_endian,
         write_xdmf=not args.no_xdmf,
         reduced_output=args.redo,
+        subgrid_size=args.subgrid_size,
     )
 
 

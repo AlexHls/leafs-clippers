@@ -40,9 +40,12 @@ class LeafsXdmf3Writer:
         self.attribute_shape = (snapshot.gnx, snapshot.gny, snapshot.gnz)
         self.outname = snapshot.basename + ".xdmf"
         self.subgrid_size = subgrid_size or self.grid_shape
+        self.idx = (2, 1, 0)  # The order of the dimensions in the HDF5 file
         # In case of 2D grid, set the z dimension to 1
         if snapshot.gnz == 1:
             self.subgrid_size = (self.subgrid_size[0], self.subgrid_size[1], 1)
+            # Weird ordering, but seems to be working
+            self.idx = (1, 0, 2)
 
     @property
     def _ignore_keys(self):
@@ -133,15 +136,16 @@ class LeafsXdmf3Writer:
     def _write_attribute(
         self, f, label: str, grid_shape: tuple, offset: tuple, filename: str
     ) -> None:
+        i1, i2, i3 = self.idx
         f.write(f'<Attribute Name="{label}" AttributeType="Scalar" Center="Cell">\n')
         f.write(
             '<DataItem ItemType="HyperSlab" Dimensions="{} {} {}">\n'.format(
-                grid_shape[2] - 1, grid_shape[1] - 1, grid_shape[0] - 1
+                grid_shape[i1] - 1, grid_shape[i2] - 1, grid_shape[i3] - 1
             )
         )
         f.write('<DataItem Dimensions="3 3" NumberType="Int" Format="XML">\n')
         f.write(
-            f"{offset[2]} {offset[1]} {offset[0]}\n1 1 1\n{grid_shape[2] - 1} {grid_shape[1] - 1} {grid_shape[0] - 1}\n"
+            f"{offset[i1]} {offset[i2]} {offset[i3]}\n1 1 1\n{grid_shape[i1] - 1} {grid_shape[i2] - 1} {grid_shape[i3] - 1}\n"
         )  # Start, Stride, Count
         f.write("</DataItem>\n")
         f.write(
