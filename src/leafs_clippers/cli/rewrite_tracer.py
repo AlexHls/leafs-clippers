@@ -19,6 +19,7 @@ def main(
     max_tracers=-1,
     tracer_number=[],
     tracer_range=[],
+    two_d=False,
 ):
     fin = leafs_tracer.LeafsTracer(model, snappath=snappath)
 
@@ -94,9 +95,17 @@ def main(
                 usefile=0,
                 chunksize=read_chunk,
                 quiet=(not verbose),
+                threed=(not two_d),
             )
             for ival in range(6):
-                data[:, itstp, ival] = chunk[ival, :]
+                if ival == 2 and two_d:
+                    # 2D tracer file, padd z-coords with zeros
+                    data[:, itstp, ival] = np.zeros_like(chunk[ival, :])
+                elif ival > 2 and two_d:
+                    # 2D tracer file, indices need to be shifted by one from here on
+                    data[:, itstp, ival] = chunk[ival - 1, :]
+                else:
+                    data[:, itstp, ival] = chunk[ival, :]
 
         print("Writing chunk size %d starting from %d." % (read_chunk, read_count))
         for itracer in range(read_chunk):
@@ -205,6 +214,7 @@ def cli():
         default=[],
     )
     parser.add_argument("--verbose", help="Enables verbose output", action="store_true")
+    parser.add_argument("--two_d", help="2D tracer input file", action="store_true")
 
     args = parser.parse_args()
 
@@ -217,6 +227,7 @@ def cli():
         max_tracers=args.max_tracers,
         tracer_number=args.tracer_number,
         tracer_range=args.tracer_range,
+        two_d=args.two_d,
     )
     return
 
