@@ -93,11 +93,11 @@ def plot_bubbles(x, y, z, r_bub, outname, wd_rad=None, plot_type="plotly"):
 
 
 def create_uniform_bubbles(
-    n_bub, r_bub, r_cen, r_sphere, include_center=False, uniform_compresion=0.85
+    n_bub, r_bub, x_cen, y_cen, r_sphere, include_center=False, uniform_compresion=0.85
 ):
     max_coord = (r_sphere - 2 * r_bub) * uniform_compresion / 2
-    x_coords = np.linspace(-max_coord, max_coord, n_bub) + r_cen
-    y_coords = np.linspace(-max_coord, max_coord, n_bub)
+    x_coords = np.linspace(-max_coord, max_coord, n_bub) + x_cen
+    y_coords = np.linspace(-max_coord, max_coord, n_bub) + y_cen
     z_coords = np.linspace(-max_coord, max_coord, n_bub)
 
     x = []
@@ -105,8 +105,8 @@ def create_uniform_bubbles(
     z = []
 
     if include_center:
-        x.append(r_cen)
-        y.append(0.0)
+        x.append(x_cen)
+        y.append(y_cen)
         z.append(0.0)
 
     for i in x_coords:
@@ -119,7 +119,7 @@ def create_uniform_bubbles(
     return np.array(x), np.array(y), np.array(z)
 
 
-def create_gaussian_bubbles(n_bub, r_cen, r_sphere):
+def create_gaussian_bubbles(n_bub, x_cen, y_cen, r_sphere):
     rng = np.random.default_rng()
     radius = rng.normal(0, r_sphere, size=n_bub)
     theta = rng.uniform(low=0, high=np.pi, size=n_bub)
@@ -128,8 +128,8 @@ def create_gaussian_bubbles(n_bub, r_cen, r_sphere):
     # Take the absolute of the radius
     radius = np.abs(radius)
 
-    x = radius * np.sin(theta) * np.cos(phi) + r_cen
-    y = radius * np.sin(theta) * np.sin(phi)
+    x = radius * np.sin(theta) * np.cos(phi) + x_cen
+    y = radius * np.sin(theta) * np.sin(phi) + y_cen
     z = radius * np.cos(theta)
 
     return x, y, z
@@ -147,25 +147,34 @@ def main(
     plot_type="plotly",
     include_center=False,
     uniform_compresion=0.85,
+    two_d=False,
 ):
     print("Generating ignition bubbles...")
     assert distribution_type in ["uniform", "gaussian"], "Distribution type not valid"
+
+    x_cen = r_cen
+    y_cen = 0.0
+    if two_d:
+        x_cen = 0
+        y_cen = r_cen
+
     if distribution_type == "uniform":
         if n_bub == 1:
-            x = np.array([r_cen])
-            y = np.array([0.0])
+            x = np.array([x_cen])
+            y = np.array([y_cen])
             z = np.array([0.0])
         else:
             x, y, z = create_uniform_bubbles(
                 n_bub,
                 r_bub,
-                r_cen,
+                x_cen,
+                y_cen,
                 r_sphere,
                 include_center=include_center,
                 uniform_compresion=uniform_compresion,
             )
     elif distribution_type == "gaussian":
-        x, y, z = create_gaussian_bubbles(n_bub, r_cen, r_sphere)
+        x, y, z = create_gaussian_bubbles(n_bub, x_cen, y_cen, r_sphere)
 
     if create_plot:
         print("Plotting bubbles...")
@@ -259,6 +268,11 @@ def cli():
         type=float,
         default=0.85,
     )
+    parser.add_argument(
+        "--two_d",
+        help="Instead of placing the bubbles on the x-axis, place them on the y-axis.",
+        action="store_true",
+    )
 
     args = parser.parse_args()
 
@@ -273,6 +287,8 @@ def cli():
         args.wd_rad,
         args.plot_type,
         args.include_center,
+        args.uniform_compresion,
+        args.two_d,
     )
     return
 
