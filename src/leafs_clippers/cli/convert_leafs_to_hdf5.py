@@ -36,6 +36,7 @@ def main(
     big_endian=False,
     write_xdmf=True,
     reduced_output=False,
+    subgrid_size=(64, 64, 64),
 ):
     file_base = "redo" if reduced_output else "o"
     snaplist = lc.get_snaplist(
@@ -76,7 +77,7 @@ def main(
                 little_endian=not big_endian,
                 reduced_output=reduced_output,
             )
-            writer = lu.LeafsXdmf3Writer(s)
+            writer = lu.LeafsXdmf3Writer(s, subgrid_size=subgrid_size)
             writer.write()
             print(f"Wrote XDMF files for snapshot {snap}")
 
