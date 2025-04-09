@@ -36,6 +36,7 @@ class LeafsXdmf3Writer:
         self.filename = os.path.basename(snapshot.filename)
         self.grid_shape = (snapshot.gnx + 1, snapshot.gny + 1, snapshot.gnz + 1)
         self.attribute_shape = (snapshot.gnx, snapshot.gny, snapshot.gnz)
+        self.twod = snapshot.gnz == 1
         self.outname = snapshot.basename + ".xdmf"
 
     @property
@@ -86,16 +87,29 @@ class LeafsXdmf3Writer:
 
     def _write_geometry(self, f, grid_shape: tuple, filename: str) -> None:
         f.write('<Geometry GeometryType="VXVYVZ">\n')
-        f.write(
-            f'<DataItem Dimensions="{grid_shape[0]}" NumberType="Float" Precision="8" Format="HDF">\n'
-        )
-        f.write(f"{filename}:/edgex\n")
-        f.write("</DataItem>\n")
-        f.write(
-            f'<DataItem Dimensions="{grid_shape[1]}" NumberType="Float" Precision="8" Format="HDF">\n'
-        )
-        f.write(f"{filename}:/edgey\n")
-        f.write("</DataItem>\n")
+        if self.twod:
+            f.write(
+                f'<DataItem Dimensions="{grid_shape[1]}" NumberType="Float" Precision="8" Format="HDF">\n'
+            )
+            f.write(f"{filename}:/edgey\n")
+            f.write("</DataItem>\n")
+            f.write(
+                f'<DataItem Dimensions="{grid_shape[0]}" NumberType="Float" Precision="8" Format="HDF">\n'
+            )
+            f.write(f"{filename}:/edgex\n")
+            f.write("</DataItem>\n")
+        else:
+            f.write(
+                f'<DataItem Dimensions="{grid_shape[0]}" NumberType="Float" Precision="8" Format="HDF">\n'
+            )
+            f.write(f"{filename}:/edgex\n")
+            f.write("</DataItem>\n")
+            f.write(
+                f'<DataItem Dimensions="{grid_shape[1]}" NumberType="Float" Precision="8" Format="HDF">\n'
+            )
+            f.write(f"{filename}:/edgey\n")
+            f.write("</DataItem>\n")
+
         f.write(
             f'<DataItem Dimensions="{grid_shape[2]}" NumberType="Float" Precision="8" Format="HDF">\n'
         )
