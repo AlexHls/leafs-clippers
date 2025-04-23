@@ -253,6 +253,45 @@ class LeafsSnapshot:
         return self.data["vel_abs"]
 
     @property
+    def vel_lam(self):
+        """
+        Default to the Schwab flame speed.
+        If the Timmes flame speed is needed, use the timmes_flamespeed method.
+        """
+        return self.schwab_flamespeed(self.density, self.ye)
+
+    @property
+    def vel_turb(self):
+        """
+        Alias for q_sgs
+        """
+        if "q_sgs" in self.data:
+            # 3D
+            return self.data["q_sgs"]
+        elif "qsubgr" in self.data:
+            # 2D
+            return self.data["qsubgr"]
+        else:
+            raise ValueError("No subgrid scale energy found in snapshot.")
+
+    @property
+    def mach_rise(self):
+        _ = self.get_mach()
+        vel_rise = np.zeros_like(self.density)
+        for i in range(self.gnx):
+            for j in range(self.gny):
+                for k in range(self.gnz):
+                    vel_rise[i, j, k] = (
+                        self.velx[i, j, k] * self.geomx[i]
+                        + self.vely[i, j, k] * self.geomy[j]
+                        + self.velz[i, j, k] * self.geomz[k]
+                    ) / np.sqrt(
+                        self.geomx[i] ** 2 + self.geomy[j] ** 2 + self.geomz[k] ** 2
+                    )
+        self.data["mach_rise"] = vel_rise / self.c_sound
+        return self.data["mach_rise"]
+
+    @property
     def radius(self):
         return self.data["geomx"][self.gnx // 2 :]
 
