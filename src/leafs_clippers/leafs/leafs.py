@@ -221,6 +221,28 @@ class LeafsSnapshot:
         else:
             raise AttributeError("{} has no attribute '{}'.".format(type(self), __name))
 
+    @classmethod
+    def schwab_flamespeed(cls, rho, ye):
+        """
+        Computes the flame speed using the Schwab et al. 2020, ApJ 891:5 formula.
+        Result is in cm/s.
+        """
+
+        vlam = 16.0e5 * rho / 1e9 * (1 + 96.88 * (0.5 - ye))
+        return vlam
+
+    @classmethod
+    def timmes_flamespeed(cls, rho, xfuel):
+        """
+        Computes the flame speed using the formula of Timmes & Woosley 1992, ApJ 396:649-667
+        This is only exact if the burn density and the fuel fraction are provided.
+        These quantities are not stored in default snapshots.
+        Result is in cm/s.
+        """
+
+        vlam = 51.8e5 * (rho / 6e9) ** 1.06 * (xfuel / 0.6) ** 0.688
+        return vlam
+
     @property
     def mass(self):
         return np.array(self.density * self.vol, dtype=np.float64)
@@ -243,6 +265,11 @@ class LeafsSnapshot:
     def mach(self):
         _ = self.get_mach()
         return self.data["mach"]
+
+    @property
+    def lset_dist(self):
+        _ = self.get_lset_dist()
+        return self.data["lset_dist"]
 
     @property
     def has_remnant(self):
@@ -399,6 +426,128 @@ class LeafsSnapshot:
         self.data["mach"] = self.vel_abs / self.c_sound
 
         return self.data["mach"]
+
+    def get_lset_dist(self, border=4):
+        """
+        Get the distance to the isosurface described by the level set function.
+        Due to the lack of ghost-cells, this is only defined in the interior
+        and the edges are clipped to the maximum distance.
+        WARNING: For now this only works on the first levelset.
+        Also probably only works in 3D.
+
+        Parameters
+        ----------
+        border : int, optional
+            The number of cells for which to compute the distance in
+            each direction.
+        """
+        if not self.ignore_cache:
+            if self._load_derived("lset_dist"):
+                return
+
+        assert self.lset1 is not None, "No level set function available"
+
+        # Base distance to which everything gets clipped
+        xlen = self.edgex[:-1] - self.edgex[1:]
+        ylen = self.edgey[:-1] - self.edgey[1:]
+        zlen = self.edgez[:-1] - self.edgez[1:]
+        ref_len = np.min([xlen, ylen, zlen])
+        dist = np.ones_like(self.density)
+        for i in range(self.gnx):
+            for j in range(self.gny):
+                for k in range(self.gnz):
+                    dist[i, j, k] = (
+                        20 * 4 * max([xlen[i], ylen[j], zlen[k], ref_len])
+                    ) ** 2
+        # x-dir
+        for i in range(self.gnx - 1):
+            for j in range(self.gny):
+                for k in range(self.gnz):
+                    if (self.lset1[i, j, k] * self.lset1[i + 1, j, k]) < 0:
+                        crx = self.geomx[i] + np.abs(self.lset1[i, j, k]) / np.abs(
+                            self.lset1[i + 1, j, k] - self.lset1[i, j, k]
+                        ) * (self.geomx[i + 1] - self.geomx[i])
+                        for i2 in range(
+                            np.max([0, i - border]), np.min([self.gnx, i + border + 1])
+                        ):
+                            for k2 in range(
+                                np.max([0, k - border]), np.min([self.gnz, k + border])
+                            ):
+                                for j2 in range(
+                                    np.max([0, j - border]),
+                                    np.min([self.gny, j + border]),
+                                ):
+                                    dist[i2, j2, k2] = min(
+                                        dist[i2, j2, k2],
+                                        np.abs(
+                                            (self.geomx[i2] - crx) ** 2
+                                            + (self.geomy[j2] - self.geomy[j]) ** 2
+                                            + (self.geomz[k2] - self.geomz[k]) ** 2
+                                        ),
+                                    )
+
+        # y-dir
+        for i in range(self.gnx):
+            for j in range(self.gny - 1):
+                for k in range(self.gnz):
+                    if (self.lset1[i, j, k] * self.lset1[i, j + 1, k]) < 0:
+                        cry = self.geomy[j] + np.abs(self.lset1[i, j, k]) / np.abs(
+                            self.lset1[i, j + 1, k] - self.lset1[i, j, k]
+                        ) * (self.geomy[j + 1] - self.geomy[j])
+                        for i2 in range(
+                            np.max([0, i - border]), np.min([self.gnx, i + border])
+                        ):
+                            for k2 in range(
+                                np.max([0, k - border]),
+                                np.min([self.gnz, k + border + 1]),
+                            ):
+                                for j2 in range(
+                                    np.max([0, j - border]),
+                                    np.min([self.gny, j + border]),
+                                ):
+                                    dist[i2, j2, k2] = min(
+                                        dist[i2, j2, k2],
+                                        np.abs(
+                                            (self.geomx[i2] - self.geomx[i]) ** 2
+                                            + (self.geomy[j2] - cry) ** 2
+                                            + (self.geomz[k2] - self.geomz[k]) ** 2
+                                        ),
+                                    )
+
+        # z-dir
+        for i in range(self.gnx):
+            for j in range(self.gny):
+                for k in range(self.gnz - 1):
+                    if (self.lset1[i, j, k] * self.lset1[i, j, k + 1]) < 0:
+                        crz = self.geomz[k] + np.abs(self.lset1[i, j, k]) / np.abs(
+                            self.lset1[i, j, k + 1] - self.lset1[i, j, k]
+                        ) * (self.geomz[k + 1] - self.geomz[k])
+                        for i2 in range(
+                            np.max([0, i - border]), np.min([self.gnx, i + border])
+                        ):
+                            for k2 in range(
+                                np.max([0, k - border]), np.min([self.gnz, k + border])
+                            ):
+                                for j2 in range(
+                                    np.max([0, j - border]),
+                                    np.min([self.gny, j + border + 1]),
+                                ):
+                                    dist[i2, j2, k2] = min(
+                                        dist[i2, j2, k2],
+                                        np.abs(
+                                            (self.geomx[i2] - self.geomx[i]) ** 2
+                                            + (self.geomy[j2] - self.geomy[j]) ** 2
+                                            + (self.geomz[k2] - crz) ** 2
+                                        ),
+                                    )
+
+        dist = np.sqrt(dist)
+        self.data["lset_dist"] = dist
+
+        if self.write_derived:
+            self._write_derived("lset_dist")
+
+        return self.data["lset_dist"]
 
     def get_density_in_radius(self, center, radius):
         """return the density in a sphere of radius around center"""
