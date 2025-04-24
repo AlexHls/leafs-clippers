@@ -170,6 +170,8 @@ class LeafsSnapshot:
         self.quiet = quiet
         self.filename = filename
         self.basename = filename.replace(".hdf5", "")
+        self.basedir = os.path.dirname(filename)
+        self.idx = int(self.basename[-3:])
         self.helm_table = helm_table
         self.write_derived = write_derived
         self.ignore_cache = ignore_cache
@@ -288,7 +290,7 @@ class LeafsSnapshot:
                     ) / np.sqrt(
                         self.geomx[i] ** 2 + self.geomy[j] ** 2 + self.geomz[k] ** 2
                     )
-        self.data["mach_rise"] = vel_rise / self.c_sound
+        self.data["mach_rise"] = vel_rise / self.get_c_sound()
         return self.data["mach_rise"]
 
     @property
@@ -459,12 +461,98 @@ class LeafsSnapshot:
 
     def get_mach(self):
         self.get_abs_velocity()
-        self.get_c_sound()
 
         self.data["mach"] = np.zeros_like(self.density)
-        self.data["mach"] = self.vel_abs / self.c_sound
+        self.data["mach"] = self.vel_abs / self.get_c_sound()
 
         return self.data["mach"]
+
+    def get_flame_speed_statistic(self, mach=True, schwab_flamespeed=True):
+        """
+        Returns the flame speeds averaged around the levelset, as well as
+        the standard deviation of the flame speeds. If caching is enabled,
+        it will load the values from the cache file in the output directory.
+
+        Parameters
+        ----------
+        mach : bool, optional
+            If True, the flame speed is computed in units of the sound speed.
+            If False, the flame speed is computed in cm/s. The relevant values
+            are stored in separate cache files. Default is True.
+        schwab_flamespeed : bool, optional
+            If True, the flame speed is computed using the Schwab et al. 2020
+            formula. If False, the Timmes & Woosley formula is used. Default is True.
+
+        Returns
+        -------
+        df_out : pandas.DataFrame
+            A DataFrame containing the mean and standard deviation of the
+            flame speeds of the current snapshot, not the whole simulation.
+        """
+        # If no EOS available, disable mach conversion
+        if self.eos is None:
+            print("No EOS available, setting mach to False.")
+            mach = False
+
+        if mach:
+            cache_filename = os.path.join(self.basedir, "flame_speed_mach.csv")
+        else:
+            cache_filename = os.path.join(self.basedir, "flame_speed.csv")
+        if not self.ignore_cache:
+            try:
+                df = pd.read_csv(cache_filename, index_col=0)
+                if self.idx in df.index:
+                    return df.loc[self.idx]
+            except FileNotFoundError:
+                pass
+
+        _ = self.get_lset_dist()
+
+        max_dist = np.max(self.lset_dist)
+        mask = self.lset_dist < max_dist
+
+        c_sound = 1.0
+        if mach:
+            c_sound = self.get_c_sound()
+            c_sound = c_sound[mask]
+
+        v_turb = self.vel_turb[mask] / c_sound
+        v_lam = np.zeros_like(v_turb)
+        if schwab_flamespeed:
+            v_lam = self.vel_lam[mask] / c_sound
+        else:
+            v_lam = self.timmes_flamespeed(self.density, self.xfuel)
+            v_lam = v_lam[mask] / c_sound
+
+        # Mach rise is always in units of sound speed
+        m_rise = self.mach_rise[mask]
+
+        v_turb_mean, v_turb_std = np.mean(v_turb), np.std(v_turb)
+        v_lam_mean, v_lam_std = np.mean(v_lam), np.std(v_lam)
+        m_rise_mean, m_rise_std = np.mean(m_rise), np.std(m_rise)
+
+        data = {
+            "v_turb_mean": v_turb_mean,
+            "v_turb_std": v_turb_std,
+            "v_lam_mean": v_lam_mean,
+            "v_lam_std": v_lam_std,
+            "m_rise_mean": m_rise_mean,
+            "m_rise_std": m_rise_std,
+        }
+        df_out = pd.DataFrame(data, index=[self.idx])
+
+        if self.write_derived:
+            # If a cache file already exists, load it and overwrite the
+            # corresponding index if it exists.
+            if os.path.exists(cache_filename):
+                df = pd.read_csv(cache_filename, index_col=0)
+                df_cache = pd.concat([df, df_out]).drop_duplicates(keep="last")
+                df_cache = df_cache.sort_index()
+                df_cache.to_csv(cache_filename, index=True)
+            else:
+                df_out.to_csv(cache_filename, index=True)
+
+        return df_out
 
     def get_lset_dist(self, border=4):
         """
