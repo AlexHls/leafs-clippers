@@ -524,21 +524,23 @@ class LeafsSnapshot:
             v_lam = self.timmes_flamespeed(self.density, self.xfuel)
             v_lam = v_lam[mask] / c_sound
 
-        # Mach rise is always in units of sound speed
-        m_rise = self.mach_rise[mask]
-
         v_turb_mean, v_turb_std = np.mean(v_turb), np.std(v_turb)
         v_lam_mean, v_lam_std = np.mean(v_lam), np.std(v_lam)
-        m_rise_mean, m_rise_std = np.mean(m_rise), np.std(m_rise)
-
         data = {
             "v_turb_mean": v_turb_mean,
             "v_turb_std": v_turb_std,
             "v_lam_mean": v_lam_mean,
             "v_lam_std": v_lam_std,
-            "m_rise_mean": m_rise_mean,
-            "m_rise_std": m_rise_std,
         }
+
+        if mach:
+            # Mach rise is always in units of sound speed
+            m_rise = self.mach_rise[mask]
+
+            m_rise_mean, m_rise_std = np.mean(m_rise), np.std(m_rise)
+            data["m_rise_mean"] = m_rise_mean
+            data["m_rise_std"] = m_rise_std
+
         df_out = pd.DataFrame(data, index=[self.idx])
 
         if self.write_derived:
