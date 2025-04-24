@@ -14,9 +14,9 @@ def main(
     map = lm.LeafsMapping(snappath=snappath, tppnppath=tppnppath)
 
     if one_dim:
-        map.map1D(resolution=res, vacuum_threshold=vacuum_threshold, max_vel=max_vel)
+        map.map1D(res=res, vacuum_threshold=vacuum_threshold, max_vel=max_vel)
     else:
-        map.map3D(resolution=res, vacuum_threshold=vacuum_threshold, max_vel=max_vel)
+        map.map3D(res=res, vacuum_threshold=vacuum_threshold, max_vel=max_vel)
 
     return
 
