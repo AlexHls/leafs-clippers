@@ -521,23 +521,26 @@ class LeafsSnapshot:
             v_lam = self.timmes_flamespeed(self.density, self.xfuel)
             v_lam = v_lam[mask] / c_sound
 
-        v_turb_mean, v_turb_std = np.mean(v_turb), np.std(v_turb)
-        v_lam_mean, v_lam_std = np.mean(v_lam), np.std(v_lam)
+        v_turb_median, v_turb_16, v_turb_84 = np.percentile(v_turb, [50, 16, 84])
+        v_lam_median, v_lam_16, v_lam_84 = np.percentile(v_lam, [50, 16, 84])
         data = {
             "time": self.time,
-            "v_turb_mean": v_turb_mean,
-            "v_turb_std": v_turb_std,
-            "v_lam_mean": v_lam_mean,
-            "v_lam_std": v_lam_std,
+            "v_turb_median": v_turb_median,
+            "v_turb_16": v_turb_16,
+            "v_turb_84": v_turb_84,
+            "v_lam_median": v_lam_median,
+            "v_lam_16": v_lam_16,
+            "v_lam_84": v_lam_84,
         }
 
         if mach:
             # Mach rise is always in units of sound speed
             m_rise = self.mach_rise[mask]
 
-            m_rise_mean, m_rise_std = np.mean(m_rise), np.std(m_rise)
-            data["m_rise_mean"] = m_rise_mean
-            data["m_rise_std"] = m_rise_std
+            m_rise_median, m_rise_16, m_rise_84 = np.percentile(m_rise, [50, 16, 84])
+            data["m_rise_median"] = m_rise_median
+            data["m_rise_16"] = m_rise_16
+            data["m_rise_84"] = m_rise_84
 
         df_out = pd.DataFrame(data, index=[self.idx])
 
