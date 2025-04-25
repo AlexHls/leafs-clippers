@@ -518,7 +518,7 @@ class LeafsSnapshot:
         if schwab_flamespeed:
             v_lam = self.vel_lam[mask] / c_sound
         else:
-            v_lam = self.timmes_flamespeed(self.density, self.xfuel)
+            v_lam = self.timmes_flamespeed(self.density, self.xnuc02)
             v_lam = v_lam[mask] / c_sound
 
         v_turb_median, v_turb_16, v_turb_84 = np.percentile(v_turb, [50, 16, 84])
