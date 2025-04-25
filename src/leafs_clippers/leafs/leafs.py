@@ -280,16 +280,13 @@ class LeafsSnapshot:
     @property
     def mach_rise(self):
         vel_rise = np.zeros_like(self.density)
-        for i in range(self.gnx):
-            for j in range(self.gny):
-                for k in range(self.gnz):
-                    vel_rise[i, j, k] = (
-                        self.velx[i, j, k] * self.geomx[i]
-                        + self.vely[i, j, k] * self.geomy[j]
-                        + self.velz[i, j, k] * self.geomz[k]
-                    ) / np.sqrt(
-                        self.geomx[i] ** 2 + self.geomy[j] ** 2 + self.geomz[k] ** 2
-                    )
+        x = self.geomx[:, None, None]
+        y = self.geomy[None, :, None]
+        z = self.geomz[None, None, :]
+
+        vel_rise = self.velx * x + self.vely * y + self.velz * z
+        vel_rise /= np.sqrt(x**2 + y**2 + z**2)
+
         self.data["mach_rise"] = vel_rise / self.get_c_sound()
         return self.data["mach_rise"]
 
