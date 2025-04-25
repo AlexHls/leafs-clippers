@@ -279,7 +279,6 @@ class LeafsSnapshot:
 
     @property
     def mach_rise(self):
-        _ = self.get_mach()
         vel_rise = np.zeros_like(self.density)
         for i in range(self.gnx):
             for j in range(self.gny):
@@ -435,7 +434,7 @@ class LeafsSnapshot:
 
         if not self.ignore_cache:
             if self._load_derived("c_sound"):
-                return
+                return self.data["c_sound"]
 
         self.data["c_sound"] = np.zeros_like(self.density)
         abar = np.array(self.Amean.flatten(), dtype=np.float64)
@@ -576,7 +575,7 @@ class LeafsSnapshot:
 
         if not self.ignore_cache:
             if self._load_derived("lset_dist"):
-                return
+                return self.data["lset_dist"]
 
         assert self.lset1 is not None, "No level set function available"
 
