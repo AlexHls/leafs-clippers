@@ -524,6 +524,7 @@ class LeafsSnapshot:
         v_turb_mean, v_turb_std = np.mean(v_turb), np.std(v_turb)
         v_lam_mean, v_lam_std = np.mean(v_lam), np.std(v_lam)
         data = {
+            "time": self.time,
             "v_turb_mean": v_turb_mean,
             "v_turb_std": v_turb_std,
             "v_lam_mean": v_lam_mean,
