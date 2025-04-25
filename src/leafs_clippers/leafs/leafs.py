@@ -415,7 +415,7 @@ class LeafsSnapshot:
     def get_abs_velocity(self):
         if not self.ignore_cache:
             if self._load_derived("vel_abs"):
-                return
+                return self.data["vel_abs"]
 
         self.data["vel_abs"] = np.sqrt(
             self.data["velx"] ** 2 + self.data["vely"] ** 2 + self.data["velz"] ** 2
@@ -626,7 +626,7 @@ class LeafsSnapshot:
         # Attempt to load internal energy from cache
         if not self.ignore_cache:
             if self._load_derived("e_internal"):
-                return
+                return self.data["e_internal"]
 
         if not self.quiet:
             print("Computing internal energy from EOS...")
