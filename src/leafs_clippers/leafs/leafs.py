@@ -1439,7 +1439,7 @@ class LeafsSnapshot:
             raise ValueError("No quantity named {:s} in data dictionary".format(key))
 
         if mask is not None:
-            mask = self._get_slice(mask, axis, index, boxsize, center_offset)
+            mask = self._get_slice(mask, axis, index, boxsize, center_offset).T
             Z = np.ma.masked_array(Z, mask=np.logical_not(mask))
 
         if show_lsets:
