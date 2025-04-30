@@ -21,6 +21,7 @@ KEY_TO_LABEL_DICT = {
     "xnuc06": r"$xnuc06$",
     "energy": r"$\epsilon$ (erg g$^{-1}$)",
     "Amean": r"$A_{\rm mean}$",
+    "q_sgs": r"$q_{\rm sgs}$ (cm s$^{-1}$)",
 }
 
 KEY_TO_CMAP_DICT = {
