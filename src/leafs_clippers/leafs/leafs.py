@@ -432,12 +432,13 @@ class LeafsSnapshot:
         """
         Degeneracy parameter for electrons.
         This isn't cached, the computation should be fast enough.
+        https://physics.stackexchange.com/questions/168727/meaning-of-strongly-and-weakly-degenerate
         """
         ne = const.N_A * self.density.astype(np.float64) * self.ye
         ef = (
             const.H_ERG**2 / (8 * np.pi**2 * const.M_E) * (3 * np.pi**3 * ne) ** (2 / 3)
         )
-        eta = self.temp * const.K_B / ef
+        eta = ef / self.temp * const.K_B
         self.data["eta_deg"] = eta
         return self.data["eta_deg"]
 
