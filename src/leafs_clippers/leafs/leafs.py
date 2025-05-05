@@ -438,7 +438,7 @@ class LeafsSnapshot:
         ef = (
             const.H_ERG**2 / (8 * np.pi**2 * const.M_E) * (3 * np.pi**3 * ne) ** (2 / 3)
         )
-        eta = ef / self.temp * const.K_B
+        eta = ef / (self.temp * const.K_B)
         self.data["eta_deg"] = eta
         return self.data["eta_deg"]
 
