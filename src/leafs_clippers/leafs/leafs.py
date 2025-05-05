@@ -310,6 +310,11 @@ class LeafsSnapshot:
         return self.data["lset_dist"]
 
     @property
+    def eta_deg(self):
+        _ = self.get_eta_degeneracy()
+        return self.data["eta_deg"]
+
+    @property
     def has_remnant(self):
         remnant_density = np.ma.masked_array(
             self.density, mask=np.logical_not(self.density > self.remnant_threshold)
@@ -422,6 +427,19 @@ class LeafsSnapshot:
             self._write_derived("vel_abs")
 
         return self.data["vel_abs"]
+
+    def get_eta_degeneracy(self):
+        """
+        Degeneracy parameter for electrons.
+        This isn't cached, the computation should be fast enough.
+        """
+        ne = const.N_A * self.density.astype(np.float64) * self.ye
+        ef = (
+            const.H_ERG**2 / (8 * np.pi**2 * const.M_E) * (3 * np.pi**3 * ne) ** (2 / 3)
+        )
+        eta = self.temp * const.K_B / ef
+        self.data["eta_deg"] = eta
+        return self.data["eta_deg"]
 
     def get_c_sound(self):
         if self.eos is None:

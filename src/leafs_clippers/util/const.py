@@ -1,5 +1,9 @@
 C_LIGHT = 299792.458  # c in km/s
 H_ERG = 6.62607015e-27  # Plancks constant (erg.s)
+N_A = 6.02214076e23  # Avogadro's number (mol^-1)
+M_E = 9.10938188e-28  # Electron mass (g)
+M_U = 1.660538782e-24  # Atomic mass unit (g)
+K_B = 1.3806504e-16
 C_AA = 299792458 * 1.0e10  # in AA/s
 M_SOL = 1.989e33  # solar mass in g
 R_SOL = 6.955e10  # solar radius in cm
