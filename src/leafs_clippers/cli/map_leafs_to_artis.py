@@ -10,11 +10,17 @@ def main(
     res=100,
     vacuum_threshold=1e-4,
     max_vel=0.0,
+    decay_time=0.0,
 ):
     map = lm.LeafsMapping(snappath=snappath, tppnppath=tppnppath)
 
     if one_dim:
-        map.map1D(res=res, vacuum_threshold=vacuum_threshold, max_vel=max_vel)
+        map.map1D(
+            res=res,
+            vacuum_threshold=vacuum_threshold,
+            max_vel=max_vel,
+            decay_time=decay_time,
+        )
     else:
         map.map3D(res=res, vacuum_threshold=vacuum_threshold, max_vel=max_vel)
 
@@ -57,6 +63,12 @@ def cli():
         type=float,
         default=0.0,
         help="Maximum velocity for the mapping",
+    )
+    parser.add_argument(
+        "--decay_time",
+        type=float,
+        default=0.0,
+        help="Decay time for radioactives. Only used in 1D mapping",
     )
 
     args = parser.parse_args()
