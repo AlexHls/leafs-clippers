@@ -80,6 +80,7 @@ def cli():
         res=args.resolution,
         vacuum_threshold=args.vacuum_threshold,
         max_vel=args.max_vel,
+        decay_time=args.decay_time,
     )
 
     return

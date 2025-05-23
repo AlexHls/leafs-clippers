@@ -20,12 +20,6 @@ class RadioactiveDecay:
             List of isotopes to exclude from the decay calculation.
         """
 
-        try:
-            import radioactivedecay as rd
-        except ImportError:
-            raise ImportError(
-                "Please install the radioactivedecay package to use this class."
-            )
         self.xiso = xiso
         self.mass = mass
         self.isos = isos
@@ -58,6 +52,13 @@ class RadioactiveDecay:
         xiso_after : numpy.ndarray
             The isotopic composition after decay.
         """
+
+        try:
+            import radioactivedecay as rd
+        except ImportError:
+            raise ImportError(
+                "Please install the radioactivedecay package to use this class."
+            )
 
         xiso_after = np.zeros((len(self.mass), len(self.isos)))
 

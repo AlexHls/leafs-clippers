@@ -640,6 +640,7 @@ class LeafsMapping:
             )
 
         if decay_time > 0:
+            print("Doing radioactive decay...")
             rd = lrd.RadioactiveDecay(
                 shell_iso,
                 shell_mass,
