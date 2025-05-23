@@ -6,6 +6,7 @@ from leafs_clippers.leafs import leafs as lc
 from leafs_clippers.leafs import leafs_tracer as lt
 from leafs_clippers.util import const as const
 from leafs_clippers.util import utilities as util
+from leafs_clippers.util import radioactivedecay as lrd
 
 
 def read_1d_artis_model(root_dir=".", nradioactives=4, max_element=30):
@@ -572,6 +573,7 @@ class LeafsMapping:
         vacuum_threshold=1e-4,
         max_vel=0,
         radioactives=["ni56", "co56", "fe52", "cr48"],
+        decay_time=0.0,
         write_files=True,
         overwrite=False,
     ):
@@ -588,6 +590,9 @@ class LeafsMapping:
             The maximum velocity to consider. Default: 0.
         radioactives : list, optional
             The list of radioactive isotopes to consider. Default: ["ni56", "co56", "fe52", "cr48"].
+        decay_time : float, optional
+            If decay_time > 0, all radioactive isotopes will be decayed by decay_time.
+            Time has to be in days. Default: 0.0.
         write_files : bool, optional
             Write the ARTIS files. Default: True.
         overwrite : bool, optional
@@ -613,24 +618,16 @@ class LeafsMapping:
             self.tracer.frad, bins=res, range=[rad_bound, self.boxsize / 2]
         )
 
-        zm = int(max(self.tracer.z) + 1)
-        el = np.zeros(
-            [self.tracer.npart, zm]
-        )  # Sum gets the number of True elements in the mask
-        shell_abund = np.zeros([res, zm])
-        for iz in range(zm):
-            el[:, iz] = self.tracer.xiso[:, self.tracer.z == iz].sum(axis=1)
-
-        for iz in range(zm):
-            shell_abund[:, iz], _, _ = util.binned_statistic_weighted(
-                self.tracer.frad,
-                el[:, iz],
-                self.tracer.mass,
-                bins=res,
-                range=[rad_bound, self.boxsize / 2],
-                statistic="sum",
-            )
-
+        shell_radius, shell_rho, shell_edges = self.s.get_rad_profile(
+            "density",
+            res=res,
+            min_radius=rad_bound,
+            max_radius=0.5 * self.boxsize,
+            return_edges=True,
+        )
+        shell_mass = shell_rho * (
+            4.0 / 3.0 * np.pi * (shell_edges[1:] ** 3 - shell_edges[:-1] ** 3)
+        )
         shell_iso = np.zeros([res, len(self.tracer.isos)])
         for iso in range(len(self.tracer.isos)):
             shell_iso[:, iso], _, _ = util.binned_statistic_weighted(
@@ -642,34 +639,26 @@ class LeafsMapping:
                 statistic="sum",
             )
 
-        shell_ige, _, _ = util.binned_statistic_weighted(
-            self.tracer.frad,
-            el[:, 21:].sum(axis=1),
-            self.tracer.mass,
-            bins=res,
-            range=[rad_bound, self.boxsize / 2],
-            statistic="sum",
-        )
+        if decay_time > 0:
+            rd = lrd.RadioactiveDecay(
+                shell_iso,
+                shell_mass,
+                self.tracer.isos,
+                exclude=[x.upper() for x in radioactives],
+            )
+            shell_iso = rd.decay(decay_time)
+
+        zm = int(max(self.tracer.z) + 1)
+        shell_abund = np.zeros([res, zm])
+        for iz in range(zm):
+            shell_abund[:, iz] = shell_iso[:, self.tracer.z == iz].sum(axis=1)
+
+        shell_ige = shell_iso[:, 21:].sum(axis=1)
 
         shell_rad = np.zeros([res, len(radioactives)])
         for i in range(len(radioactives)):
             ispecies = self.tracer.isos.index(radioactives[i])
-            shell_rad[:, i], _, _ = util.binned_statistic_weighted(
-                self.tracer.frad,
-                self.tracer.xiso[:, ispecies],
-                self.tracer.mass,
-                bins=res,
-                range=[rad_bound, self.boxsize / 2],
-                statistic="sum",
-            )
-
-        shell_radius, shell_rho, shell_edges = self.s.get_rad_profile(
-            "density",
-            res=res,
-            min_radius=rad_bound,
-            max_radius=0.5 * self.boxsize,
-            return_edges=True,
-        )
+            shell_rad[:, i] = shell_iso[:, ispecies]
 
         if not self.quiet:
             print(f"Lost mass: {self.tracer.mass.sum() - shell_rho.sum()}")
