@@ -651,9 +651,6 @@ class LeafsMapping:
             range=[rad_bound, self.boxsize / 2],
             statistic="sum",
         )
-        print(shell_mass.shape)
-        print(shell_iso.shape)
-
 
         if decay_time > 0:
             print("Doing radioactive decay...")
@@ -661,7 +658,7 @@ class LeafsMapping:
                 shell_iso,
                 shell_mass,
                 self.tracer.isos,
-                exclude=[x.upper() for x in radioactives],
+                exclude=[x.capitalize() for x in radioactives],
             )
             shell_iso = rd.decay(decay_time)
 
@@ -671,7 +668,12 @@ class LeafsMapping:
         zm = int(max(self.tracer.z) + 1)
         shell_abund = np.zeros([res, zm])
         for iz in range(zm):
-            shell_abund[:, iz] = shell_iso[:, self.tracer.z == iz].sum(axis=1)
+            if iz > self.max_element - 1:
+                # Bin all elements above the maximum element into iron to
+                # ensure mass conservation. Implicitly assumes max_element > 26.
+                shell_abund[:, 26] += shell_iso[:, self.tracer.z == iz].sum(axis=1)
+            else:
+                shell_abund[:, iz] = shell_iso[:, self.tracer.z == iz].sum(axis=1)
 
         shell_ige = shell_iso[:, 21:].sum(axis=1)
 
