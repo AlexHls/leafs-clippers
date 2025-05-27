@@ -62,14 +62,21 @@ class RadioactiveDecay:
 
         xiso_after = np.zeros((len(self.mass), len(self.isos)))
 
-        inv = rd.Inventory({}, "g")
-        isos_to_decay = []
         for tp in tqdm(range(len(self.mass))):
+            inv = rd.Inventory({}, "g")
+            isos_to_decay = []
+            if all(self.xiso[tp, :] == 0.0):
+                print(f"Empty article {tp}, skipping...")
+                continue
             for i in range(len(self.isos)):
-                iso_upper = self.isos[i].upper()
+                iso_upper = self.isos[i].capitalize()
                 try:
                     inv.add({iso_upper: self.xiso[tp, i] * self.mass[tp]}, "g")
                 except ValueError:
+                    if self.isos[i] == "ni56":
+                        inv.add({"Ni-56": self.xiso[tp, i] * self.mass[tp]}, "g")
+                        print(iso_upper)
+                    #print("Missing: ", iso_upper)
                     continue
                 isos_to_decay.append(self.isos[i])
             inv.remove(self.exclude)

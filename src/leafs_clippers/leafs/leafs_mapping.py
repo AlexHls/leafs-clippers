@@ -639,6 +639,22 @@ class LeafsMapping:
                 statistic="sum",
             )
 
+        for i in range(res):
+            if shell_rho[i] <= vacuum_threshold:
+                shell_iso[i, :] = 0.0
+
+        shell_mass, _, _ = util.binned_statistic_weighted(
+            self.tracer.frad,
+            self.tracer.mass,
+            np.ones(self.tracer.npart),
+            bins=res,
+            range=[rad_bound, self.boxsize / 2],
+            statistic="sum",
+        )
+        print(shell_mass.shape)
+        print(shell_iso.shape)
+
+
         if decay_time > 0:
             print("Doing radioactive decay...")
             rd = lrd.RadioactiveDecay(
@@ -648,6 +664,9 @@ class LeafsMapping:
                 exclude=[x.upper() for x in radioactives],
             )
             shell_iso = rd.decay(decay_time)
+
+        if np.any(shell_iso > 1.0):
+            raise ValueError("This shouldn't happen")
 
         zm = int(max(self.tracer.z) + 1)
         shell_abund = np.zeros([res, zm])
