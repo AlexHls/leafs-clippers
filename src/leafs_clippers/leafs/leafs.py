@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from scipy.stats import binned_statistic
 from scipy.io import FortranFile
+from scipy.interpolate import RegularGridInterpolator
 
 try:
     from singularity_eos import Helmholtz
@@ -1013,6 +1014,39 @@ class LeafsSnapshot:
             return bin_centers, bin_values, bin_edges
 
         return bin_centers, bin_values
+
+    def interpolate_to_uniform_grid(self, key, res=None):
+        """
+        Interpolate a quantity to a uniform grid.
+
+        Parameters
+        ----------
+        key : str
+            The name of the quantity to interpolate.
+        res : int, optional
+            The resolution of the uniform grid. If None, the original resolution is used.
+
+        Returns
+        -------
+        np.ndarray
+            The interpolated quantity on a uniform grid.
+        """
+        assert isinstance(key, str), "Key must be a string"
+
+        if res is None:
+            res = self.gnx
+
+        x = np.linspace(self.geomx[0], self.geomx[-1], res)
+        y = np.linspace(self.geomy[0], self.geomy[-1], res)
+        z = np.linspace(self.geomz[0], self.geomz[-1], res)
+        xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
+
+        interp = RegularGridInterpolator(
+            (self.geomx, self.geomy, self.geomz), self.data[key]
+        )
+        points = np.array([xx.ravel(), yy.ravel(), zz.ravel()]).T
+
+        return interp(points).reshape((res, res, res))
 
     def _get_label_from_key(self, key):
         """
