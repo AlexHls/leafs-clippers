@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from scipy.stats import binned_statistic
 from scipy.io import FortranFile
+from scipy.interpolate import RegularGridInterpolator
 
 try:
     from singularity_eos import Helmholtz
@@ -1013,6 +1014,65 @@ class LeafsSnapshot:
             return bin_centers, bin_values, bin_edges
 
         return bin_centers, bin_values
+
+    def interpolate_to_uniform_grid(
+        self,
+        key,
+        res=None,
+        method="linear",
+        bounds_error=True,
+        fill_value=np.nan,
+        solver=None,
+        solver_args=None,
+    ):
+        """
+        Interpolate a quantity to a uniform grid.
+
+        Parameters
+        ----------
+        key : str
+            The name of the quantity to interpolate.
+        res : int, optional
+            The resolution of the uniform grid. If None, the original resolution is used.
+        method : str, optional
+            The interpolation method. Default is 'linear'.
+        bounds_error : bool, optional
+            If True, an error is raised if points are outside the interpolation domain.
+            If False, points outside the domain are assigned fill_value.
+        fill_value : float, optional
+            The value to assign to points outside the interpolation domain.
+        solver : str, optional
+            The solver to use for the interpolation. If None, the default solver is used.
+        solver_args : dict, optional
+            Additional arguments to pass to the solver.
+
+        Returns
+        -------
+        np.ndarray
+            The interpolated quantity on a uniform grid.
+        """
+        assert isinstance(key, str), "Key must be a string"
+
+        if res is None:
+            res = self.gnx
+
+        x = np.linspace(self.geomx[0], self.geomx[-1], res)
+        y = np.linspace(self.geomy[0], self.geomy[-1], res)
+        z = np.linspace(self.geomz[0], self.geomz[-1], res)
+        xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
+
+        interp = RegularGridInterpolator(
+            (self.geomx, self.geomy, self.geomz),
+            self.data[key],
+            method=method,
+            bounds_error=bounds_error,
+            fill_value=fill_value,
+            solver=solver,
+            solver_args=solver_args,
+        )
+        points = np.array([xx.ravel(), yy.ravel(), zz.ravel()]).T
+
+        return interp(points).reshape((res, res, res))
 
     def _get_label_from_key(self, key):
         """
