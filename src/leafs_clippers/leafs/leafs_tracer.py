@@ -228,21 +228,21 @@ class LeafsTracer:
 
         if self.nvalues == 7 and not two_d:
             # incorrect for two_d case as pos has only two dimensions then
-            return utilities.dict2obj(
-                {
-                    "pos": data[0:3, :],
-                    "rho": data[3, :],
-                    "temp": data[4, :],
-                    "ene": data[5, :],
-                    "nvalues": self.nvalues,
-                    "time": time,
-                    "data": data,
-                }
-            )
+            return utilities.dict2obj({
+                "pos": data[0:3, :],
+                "rho": data[3, :],
+                "temp": data[4, :],
+                "ene": data[5, :],
+                "nvalues": self.nvalues,
+                "time": time,
+                "data": data,
+            })
         else:
-            return utilities.dict2obj(
-                {"data": data, "nvalues": self.nvalues, "time": time}
-            )
+            return utilities.dict2obj({
+                "data": data,
+                "nvalues": self.nvalues,
+                "time": time,
+            })
 
     def get_times(self, quiet=False):
         if not quiet:
@@ -336,20 +336,59 @@ class LeafsTracer:
 
         if self.nvalues == 7 and not two_d:
             # incorrect for two_d case as pos has only two dimensions then
-            return utilities.dict2obj(
-                {
-                    "pos": data[0:3, :],
-                    "rho": data[3, :],
-                    "temp": data[4, :],
-                    "ene": data[5, :],
-                    "nvalues": self.nvalues,
-                    "time": ttime,
-                }
-            )
+            return utilities.dict2obj({
+                "pos": data[0:3, :],
+                "rho": data[3, :],
+                "temp": data[4, :],
+                "ene": data[5, :],
+                "nvalues": self.nvalues,
+                "time": ttime,
+            })
         else:
-            return utilities.dict2obj(
-                {"data": data, "nvalues": self.nvalues, "time": ttime}
-            )
+            return utilities.dict2obj({
+                "data": data,
+                "nvalues": self.nvalues,
+                "time": ttime,
+            })
+
+        return False
+
+    def attime(self, time, two_d=False):
+        # set two_d to avoid getting wrong dictionary entries
+
+        fileid = 0
+        while (fileid + 1 < self.nfiles) and (self.starttimes[fileid + 1] < time):
+            fileid += 1
+
+        f = open(self.files[fileid], "rb")
+        if fileid == 0:
+            f.seek(self.headerlen, 0)
+
+        header = f.read(4)
+        while len(header) == 4:
+            (ttime,) = struct.unpack("<d", f.read(8))
+            if ttime >= time:
+                print("Loading data at time %g." % ttime)
+                data = np.fromfile(
+                    f, dtype="float32", count=self.npart * (self.nvalues - 1)
+                ).reshape(self.nvalues - 1, self.npart)
+
+                if self.nvalues == 7 and not two_d:
+                    # incorrect for two_d case as pos has only two dimensions then
+                    return utilities.dict2obj({
+                        "pos": data[0:3, :],
+                        "rho": data[3, :],
+                        "temp": data[4, :],
+                        "ene": data[5, :],
+                        "nvalues": self.nvalues,
+                    })
+                else:
+                    return utilities.dict2obj({"data": data, "nvalues": self.nvalues})
+
+            else:
+                f.seek(self.npart * (self.nvalues - 1) * 4 + 4, 1)
+
+            header = f.read(4)
 
         return False
 
@@ -547,21 +586,21 @@ class LeafsTracer:
 
         if self.nvalues == 7 and not two_d:
             # incorrect for two_d case as pos has only two dimensions then
-            return utilities.dict2obj(
-                {
-                    "pos": data[0:3, :],
-                    "rho": data[3, :],
-                    "temp": data[4, :],
-                    "ene": data[5, :],
-                    "nvalues": self.nvalues,
-                    "time": time,
-                    "data": data,
-                }
-            )
+            return utilities.dict2obj({
+                "pos": data[0:3, :],
+                "rho": data[3, :],
+                "temp": data[4, :],
+                "ene": data[5, :],
+                "nvalues": self.nvalues,
+                "time": time,
+                "data": data,
+            })
         else:
-            return utilities.dict2obj(
-                {"data": data, "nvalues": self.nvalues, "time": time}
-            )
+            return utilities.dict2obj({
+                "data": data,
+                "nvalues": self.nvalues,
+                "time": time,
+            })
 
     def count_timesteps(self, quiet=False):
         timestepcount = 0
@@ -654,26 +693,22 @@ class LeafsTracer:
 
         if self.nvalues == 7 and not two_d:
             # incorrect for two_d case as pos has only two dimensions then
-            return utilities.dict2obj(
-                {
-                    "time": values[:, :, 0],
-                    "pos": values[:, :, 1:4],
-                    "rho": values[:, :, 4],
-                    "temp": values[:, :, 5],
-                    "ene": values[:, :, 6],
-                    "tsteps": timestepcount,
-                    "nvalues": self.nvalues,
-                }
-            )
+            return utilities.dict2obj({
+                "time": values[:, :, 0],
+                "pos": values[:, :, 1:4],
+                "rho": values[:, :, 4],
+                "temp": values[:, :, 5],
+                "ene": values[:, :, 6],
+                "tsteps": timestepcount,
+                "nvalues": self.nvalues,
+            })
         else:
-            return utilities.dict2obj(
-                {
-                    "time": values[:, :, 0],
-                    "data": values[:, :, 1:],
-                    "tsteps": timestepcount,
-                    "nvalues": self.nvalues,
-                }
-            )
+            return utilities.dict2obj({
+                "time": values[:, :, 0],
+                "data": values[:, :, 1:],
+                "tsteps": timestepcount,
+                "nvalues": self.nvalues,
+            })
 
 
 class LeafsTracerUtil(object):
