@@ -232,7 +232,7 @@ class LeafsSnapshot:
         Result is in cm/s.
         """
 
-        vlam = 16.0e5 * rho / 1e9 * (1 + 96.88 * (0.5 - ye))
+        vlam = 16.0e5 * (rho / 1e9) ** 0.813 * (1 + 96.88 * (0.5 - ye))
         return vlam
 
     @classmethod
