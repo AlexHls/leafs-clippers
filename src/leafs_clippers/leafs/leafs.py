@@ -484,7 +484,9 @@ class LeafsSnapshot:
 
         return self.data["mach"]
 
-    def get_flame_speed_statistic(self, mach=True, schwab_flamespeed=True):
+    def get_flame_speed_statistic(
+        self, mach=True, schwab_flamespeed=True, fix_xfuel=None
+    ):
         """
         Returns the flame speeds averaged around the levelset, as well as
         the standard deviation of the flame speeds. If caching is enabled,
@@ -499,6 +501,12 @@ class LeafsSnapshot:
         schwab_flamespeed : bool, optional
             If True, the flame speed is computed using the Schwab et al. 2020
             formula. If False, the Timmes & Woosley formula is used. Default is True.
+        fix_xfuel : float, optional
+            If not None, the fuel fraction is fixed to this value when using the
+            Timmes & Woosley formula. This is useful to avoid the impact of
+            burned material behind the flame which would result in very low flame speeds.
+            This material, however, is not relevant for the flame propagation.
+            If None, the actual fuel fraction is used. Default is None.
 
         Returns
         -------
@@ -538,7 +546,10 @@ class LeafsSnapshot:
         if schwab_flamespeed:
             v_lam = self.vel_lam[mask] / c_sound
         else:
-            v_lam = self.timmes_flamespeed(self.density, self.xnuc02)
+            if fix_xfuel is not None:
+                v_lam = self.timmes_flamespeed(self.density, fix_xfuel)
+            else:
+                v_lam = self.timmes_flamespeed(self.density, self.xnuc02)
             v_lam = v_lam[mask] / c_sound
 
         v_turb_median, v_turb_16, v_turb_84 = np.percentile(v_turb, [50, 16, 84])
