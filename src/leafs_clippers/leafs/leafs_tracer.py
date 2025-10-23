@@ -753,13 +753,16 @@ class LeafsTracer:
 
         """
         # set two_d to avoid getting wrong dictionary entries
-        if not quiet:
-            print("npart: %d, nvalues: %d" % (self.npart, self.nvalues))
 
         if isinstance(id, int):
             id = np.array([id])
 
         npart = len(id)
+
+        if not quiet:
+            print("npart: %d, nvalues: %d" % (self.npart, self.nvalues))
+            print(f"Getting {npart} tracers...")
+            print("IDs: ", id)
 
         timestepcount = 0
 
@@ -792,7 +795,7 @@ class LeafsTracer:
                     data = np.fromfile(
                         f, dtype="float32", count=self.npart * (self.nvalues - 1)
                     ).reshape(self.nvalues - 1, self.npart)
-                    values[timestepcount, :, 1:] = data[:, id]
+                    values[timestepcount, :, 1:] = data[:, id].T
 
                     timestepcount += 1
                 else:
