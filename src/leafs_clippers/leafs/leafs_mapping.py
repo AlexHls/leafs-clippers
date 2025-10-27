@@ -160,16 +160,18 @@ class MappingTracer:
             self.frad = np.array(fpos, dtype="float64")
             self.xiso = np.array(fpos, dtype="float64")
 
-            unbound = np.array(unbound_new)
+            unbound = np.array(unbound_new) - 1
 
-        # Convert tppnp ids to array indices
-        unbound = unbound - 1
+        else:
+            # Convert tppnp ids to array indices
+            unbound = unbound - 1
 
-        self.fpos = self.fpos[unbound]
-        self.frad = self.frad[unbound]
+            self.fpos = self.fpos[unbound]
+            self.frad = self.frad[unbound]
+            self.xiso = self.xiso[unbound]
+
         self.mass = self.mass[unbound]
         self.rho = self.rho[unbound]
-        self.xiso = self.xiso[unbound]
         self.npart = len(unbound)
 
         return
