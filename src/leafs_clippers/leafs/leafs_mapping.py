@@ -77,6 +77,7 @@ class MappingTracer:
         model="one_def",
         remove_bound_core=True,
         remnant_threshold=1e-4,
+        ignore_tracers=[],
     ):
         self._model = model
         self._snapshot = snapshot
@@ -84,6 +85,7 @@ class MappingTracer:
         self._snappath = snappath
         self._remove_bound_core = remove_bound_core
         self._remnant_threshold = remnant_threshold
+        self._ignore_tracers = ignore_tracers
 
         # Needed attributes
         self.fpos = self._trajectory.posfin()
@@ -136,6 +138,9 @@ class MappingTracer:
             remnant_velocity=remnant_velocity,
             writeout=False,
         )
+
+        # If an unbound id is in the list of failed tracers, remove it
+        unbound = np.setdiff1d(unbound, self._ignore_tracers)
 
         # Convert tppnp ids to array indices
         unbound = unbound - 1
@@ -202,6 +207,17 @@ class LeafsMapping:
         self.traj = t.particle_set()
         self.traj.load_final_abundances(tppnppath, sort=True)
 
+        # Check if failures.txt file is present in tppnp path
+        self.failures = False
+        ignore_tracers = []
+        if os.path.exists(os.path.join(tppnppath, "failures.txt")):
+            if not self.quiet:
+                print("Warning: failures.txt found in TPPNP path.")
+            self.failures = True
+            ignore_tracers = np.genfromtxt(
+                os.path.join(tppnppath, "failures.txt"), dtype=int
+            )
+
         snaps = lc.get_snaplist(snappath=snappath, model=model)
         self.s = lc.readsnap(
             snaps[-1],
@@ -218,6 +234,7 @@ class LeafsMapping:
             model=model,
             remove_bound_core=remove_bound_core,
             remnant_threshold=remnant_threshold,
+            ignore_tracers=ignore_tracers,
         )
 
         self.rhointp = None
