@@ -156,6 +156,7 @@ class LeafsMapping:
         snappath,
         tppnppath,
         model="one_def",
+        simulation_type="ONeDef",
         remnant_threshold=1e4,
         remove_bound_core=True,
         quiet=False,
@@ -172,6 +173,8 @@ class LeafsMapping:
             Path to the TPPNP output directory.
         model : str, optional
             The LEAFS model to use. Default: "one_def".
+        simulation_type : str, optional
+            The type of simulation. Default: "ONeDef".
         remnant_density : float, optional
             The density threshold for the remnant. Default: 1e4.
         remove_bound_core : bool, optional
@@ -203,6 +206,7 @@ class LeafsMapping:
         self.s = lc.readsnap(
             snaps[-1],
             model=model,
+            simulation_type=simulation_type,
             snappath=snappath,
             remnant_threshold=remnant_threshold,
         )

@@ -7,12 +7,19 @@ def main(
     snappath,
     tppnppath,
     one_dim=False,
+    model="one_def",
+    simulation_type="ONeDef",
     res=100,
     vacuum_threshold=1e-4,
     max_vel=0.0,
     decay_time=0.0,
 ):
-    map = lm.LeafsMapping(snappath=snappath, tppnppath=tppnppath)
+    map = lm.LeafsMapping(
+        snappath=snappath,
+        tppnppath=tppnppath,
+        model=model,
+        simulation_type=simulation_type,
+    )
 
     if one_dim:
         map.map1D(
@@ -70,6 +77,19 @@ def cli():
         default=0.0,
         help="Decay time for radioactives. Only used in 1D mapping",
     )
+    parser.add_argument(
+        "-m",
+        "--model",
+        type=str,
+        default="one_def",
+        help="The LEAFS model to use. Default is 'one_def'",
+    )
+    parser.add_argument(
+        "--simulation_type",
+        type=str,
+        default="ONeDef",
+        help="The type of LEAFS simulation. Default is 'ONeDef'",
+    )
 
     args = parser.parse_args()
 
@@ -81,6 +101,8 @@ def cli():
         vacuum_threshold=args.vacuum_threshold,
         max_vel=args.max_vel,
         decay_time=args.decay_time,
+        model=args.model,
+        simulation_type=args.simulation_type,
     )
 
     return
