@@ -144,9 +144,10 @@ class MappingTracer:
         # for the tppnp fields
         if len(self._ignore_tracers) > 0:
             pnum = self._trajectory.pnum()
-            unbound_pnum = []
+            unbound_pnum, unbound_clean = [], []
+            unbound_set, ignore_set = set(unbound), set(self._ignore_tracers)
             for i, idx in enumerate(tqdm(pnum, desc="Removing failed tracers")):
-                if idx in unbound and idx not in self._ignore_tracers:
+                if idx in unbound_set and idx not in ignore_set:
                     unbound_pnum.append(i)
 
             self.fpos = self.fpos[unbound_pnum]
@@ -154,7 +155,7 @@ class MappingTracer:
             self.xiso = self.xiso[unbound_pnum]
 
             # Convert tppnp ids to array indices
-            unbound = unbound - 1
+            unbound = np.array(unbound_clean) - 1
         else:
             # Convert tppnp ids to array indices
             unbound = unbound - 1
