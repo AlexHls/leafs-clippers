@@ -518,7 +518,7 @@ class LeafsTracer:
                 fout.close()
                 raise ValueError()
 
-            useblock = np.zeros(blockcount, dtype=np.bool8)
+            useblock = np.zeros(blockcount, dtype=np.bool)
             blocktimes = np.zeros(blockcount)
 
             count = 0
@@ -729,7 +729,9 @@ class LeafsTracer:
                 }
             )
 
-    def loadtracer(self, id, two_d=False, quiet=False, nsteps=None):
+    def loadtracer(
+        self, id, two_d=False, quiet=False, nsteps=None, return_float64=False
+    ):
         """
         Load data from a single tracer
 
@@ -744,6 +746,8 @@ class LeafsTracer:
         nsteps : None or int
             If given, preallocate for nsteps timesteps, otherwise
             all files have to be scanned which can take some time.
+        return_float64 : bool
+            If True, return data as float64 (default False)
 
         Returns
         -------
@@ -783,14 +787,6 @@ class LeafsTracer:
                 (time,) = struct.unpack("<d", f.read(8))
 
                 if (i == self.nfiles - 1) or (time < self.starttimes[i + 1]):
-                    if timestepcount == nsteps:
-                        tmp = np.zeros(
-                            (nsteps * 2, npart, self.nvalues), dtype="float32"
-                        )
-                        tmp[0:nsteps, :, :] = values
-                        nsteps *= 2
-                        values = tmp
-
                     values[timestepcount, :, 0] = time
                     data = np.fromfile(
                         f, dtype="float32", count=self.npart * (self.nvalues - 1)
@@ -806,7 +802,8 @@ class LeafsTracer:
 
             f.close()
 
-        values = values.astype("float64")
+        if return_float64:
+            values = values.astype("float64")
 
         if self.nvalues == 7 and not two_d:
             # incorrect for two_d case as pos has only two dimensions then
