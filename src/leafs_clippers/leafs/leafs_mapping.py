@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from scipy.stats import binned_statistic
+from tqdm import tqdm
 
 from leafs_clippers.leafs import leafs as lc
 from leafs_clippers.leafs import leafs_tracer as lt
@@ -139,8 +140,27 @@ class MappingTracer:
             writeout=False,
         )
 
-        # If an unbound id is in the list of failed tracers, remove it
-        unbound = np.setdiff1d(unbound, self._ignore_tracers)
+        # If there are failed tracers, we need to do things tracer by tracer
+        # for the tppnp fields
+        if len(self._ignore_tracers) > 0:
+            pnum = self._trajectory.pnum()
+            unbound_new = []
+            fpos = []
+            frad = []
+            xiso = []
+            for idx in tqdm(pnum, desc="Removing failed tracers"):
+                if idx in unbound and idx not in self._ignore_tracers:
+                    unbound_new.append(idx)
+                    tracer_idx = np.where(pnum == idx)[0][0]
+                    fpos.append(self.fpos[tracer_idx])
+                    frad.append(self.frad[tracer_idx])
+                    xiso.append(self.xiso[tracer_idx])
+
+            self.fpos = np.array(fpos, dtype="float64")
+            self.frad = np.array(fpos, dtype="float64")
+            self.xiso = np.array(fpos, dtype="float64")
+
+            unbound = np.array(unbound_new)
 
         # Convert tppnp ids to array indices
         unbound = unbound - 1
