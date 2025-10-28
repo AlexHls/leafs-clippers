@@ -265,10 +265,10 @@ class LeafsTracer:
             dum1 = f.read(4)
             while len(dum1) > 0:
                 (t,) = struct.unpack("<d", f.read(8))
-                times.append(t)
                 f.seek(int(4 * self.npart * (self.nvalues - 1)), 1)
 
                 if (i == self.nfiles - 1) or (t < self.starttimes[i + 1]):
+                    times.append(t)
                     ntimesteps += 1
                 else:
                     break
