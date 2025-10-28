@@ -840,7 +840,7 @@ class LeafsTracer:
         outfile : str
             Name of output file
         nstep : int
-            How many timesteps to skip when writing tracers
+            How many tracers to skip when rewriting (similar to stride in loadalltracers).
         endAtTime : float
             Stop writing tracers at this time (default: -1, i.e. write all timesteps)
         """
@@ -855,7 +855,7 @@ class LeafsTracer:
 
         if nstep > 1 and self.tmass.min() != self.tmass.max():
             raise ValueError(
-                "This only works for equal mass tracers."
+                "Striding only works for equal mass tracers."
                 f" Found min/max mass: {self.tmass.min()}/{self.tmass.max()}."
             )
 
