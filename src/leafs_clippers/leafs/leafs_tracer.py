@@ -618,28 +618,8 @@ class LeafsTracer:
             )
 
     def count_timesteps(self, quiet=False):
-        timestepcount = 0
-        for i in range(self.nfiles):
-            if not quiet:
-                print("Doing file " + self.files[i])
-
-            f = open(self.files[i], "rb")
-            if i == 0:
-                f.seek(self.headerlen, 0)
-
-            dum1 = f.read(4)
-            while len(dum1) > 0:
-                (time,) = struct.unpack("<d", f.read(8))
-                f.seek(4 * self.npart * (self.nvalues - 1), 1)
-
-                if (i == self.nfiles - 1) or (time < self.starttimes[i + 1]):
-                    timestepcount += 1
-                else:
-                    break
-
-                _ = f.read(4)
-                dum1 = f.read(4)
-            f.close()
+        times = self.get_times(quiet=quiet)
+        timestepcount = len(times)
 
         if not quiet:
             print("Found %d timesteps." % timestepcount)
