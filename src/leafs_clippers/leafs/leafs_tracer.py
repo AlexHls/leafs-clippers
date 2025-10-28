@@ -828,6 +828,128 @@ class LeafsTracer:
                 }
             )
 
+    def extracttracers(
+        self,
+        npart,
+        startid=None,
+        mask=None,
+        noutvalues=0,
+        writeHeader=False,
+        outfile="",
+        nstep=1,
+        endAtTime=-1,
+    ):
+        """
+        Read tracer files, extract certain tracers and write them to a new file suitable for
+        postprocessing.
+
+        Parameters
+        ----------
+
+        npart : int
+            Number of tracers to be written
+        startid : int
+            First tracer to be written
+        mask : list of bool
+            Provide a bool mask to specifiy tracers to extract
+        noutvalues : int
+            Number of values to be written per tracer (including time).
+            If 0, write first 7 values (time, xpos, ypos, zpos, rho, tmp, ene).
+        writeHeader : bool
+            Write header to output file
+        outfile : str
+            Name of output file
+        nstep : int
+            How many timesteps to skip when writing tracers
+        endAtTime : float
+            Stop writing tracers at this time (default: -1, i.e. write all timesteps)
+        """
+
+        if startid is None and mask is None:
+            raise ValueError("Either startid or mask has to be provided!")
+
+        if noutvalues == 0:
+            noutvalues = 7
+
+        print("noutvalues set to %d." % noutvalues)
+
+        if nstep > 1 and self.tmass.min() != self.tmass.max():
+            raise ValueError(
+                "This only works for equal mass tracers."
+                f" Found min/max mass: {self.tmass.min()}/{self.tmass.max()}."
+            )
+
+        timestepcount = 0
+
+        if outfile == "":
+            fout = open(self.snappath + self.name + ".trace", "wb")
+        else:
+            fout = open(outfile, "wb")
+
+        if writeHeader:
+            fout.write(struct.pack("<iii", 4, npart // nstep, 4))
+            if self.vartracer:
+                fout.write(struct.pack("<i", 8 * npart // nstep))
+                if mask is None:
+                    (self.tmass[startid : startid + npart : nstep] * nstep).tofile(fout)
+                else:
+                    (self.tmass[mask] * nstep).tofile(fout)
+                fout.write(struct.pack("<i", 8 * npart // nstep))
+
+        for i in range(self.nfiles):
+            print("Doing file " + self.files[i])
+
+            f = open(self.files[i], "rb")
+            if i == 0:
+                f.seek(self.headerlen, 0)
+
+            dum1 = f.read(4)
+            while len(dum1) > 0:
+                (time,) = struct.unpack("<d", f.read(8))
+
+                if (endAtTime >= 0) and (time > endAtTime):
+                    break
+
+                data = np.fromfile(
+                    f, dtype="float32", count=self.npart * (self.nvalues - 1)
+                ).reshape(self.nvalues - 1, self.npart)
+
+                if (i == self.nfiles - 1) or (time < self.starttimes[i + 1]):
+                    fout.write(
+                        struct.pack(
+                            "<i",
+                            (8 + npart // nstep * (noutvalues - 1) * 4),
+                        )
+                    )
+                    fout.write(struct.pack("<d", (time)))
+                    if mask is None:
+                        data[
+                            : noutvalues - 1, startid : startid + npart : nstep
+                        ].tofile(fout)
+                    else:
+                        data[: noutvalues - 1, mask].tofile(fout)
+                    fout.write(
+                        struct.pack(
+                            "<i",
+                            (8 + npart // nstep * (noutvalues - 1) * 4),
+                        )
+                    )
+
+                    timestepcount += 1
+                else:
+                    break
+
+                _ = f.read(4)
+
+                dum1 = f.read(4)
+
+            f.close()
+
+        fout.close()
+
+        print("Wrote %d timesteps." % timestepcount)
+        return
+
 
 class LeafsTracerUtil(object):
     """Utility class for leafs_tracer
