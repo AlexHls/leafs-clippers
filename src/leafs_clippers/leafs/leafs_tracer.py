@@ -789,21 +789,21 @@ class LeafsTracer:
             # incorrect for two_d case as pos has only two dimensions then
             return utilities.dict2obj(
                 {
-                    "time": values[:timestepcount, :, 0],
-                    "pos": values[:timestepcount, :, 1:4],
-                    "rho": values[:timestepcount, :, 4],
-                    "temp": values[:timestepcount, :, 5],
-                    "ene": values[:timestepcount, :, 6],
-                    "tsteps": timestepcount,
+                    "time": values[:nsteps, :, 0],
+                    "pos": values[:nsteps, :, 1:4],
+                    "rho": values[:nsteps, :, 4],
+                    "temp": values[:nsteps, :, 5],
+                    "ene": values[:nsteps, :, 6],
+                    "tsteps": nsteps,
                     "nvalues": self.nvalues,
                 }
             )
         else:
             return utilities.dict2obj(
                 {
-                    "time": values[:timestepcount, :, 0],
-                    "data": values[:timestepcount, :, 1:],
-                    "tsteps": timestepcount,
+                    "time": values[:nsteps, :, 0],
+                    "data": values[:nsteps, :, 1:],
+                    "tsteps": nsteps,
                     "nvalues": self.nvalues,
                 }
             )
