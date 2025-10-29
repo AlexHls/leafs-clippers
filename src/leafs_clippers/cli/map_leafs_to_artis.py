@@ -15,6 +15,7 @@ def main(
     decay_time=0.0,
     overwrite=False,
     remove_bound_core=True,
+    center_expansion=False,
 ):
     map = lm.LeafsMapping(
         snappath=snappath,
@@ -37,6 +38,7 @@ def main(
             res=res,
             vacuum_threshold=vacuum_threshold,
             max_vel=max_vel,
+            center_expansion=center_expansion,
             overwrite=overwrite,
         )
 
@@ -110,6 +112,12 @@ def cli():
         action="store_false",
         help="Do not remove the bound core from the mapping",
     )
+    parser.add_argument(
+        "-c",
+        "--center_expansion",
+        action="store_true",
+        help="Center the box around the center of expansion",
+    )
 
     args = parser.parse_args()
 
@@ -125,6 +133,7 @@ def cli():
         simulation_type=args.simulation_type,
         overwrite=args.overwrite,
         remove_bound_core=args.no_remove_bound_core,
+        center_expansion=args.center_expansion,
     )
 
     return

@@ -1,6 +1,8 @@
 import os
 import numpy as np
 from scipy.stats import binned_statistic
+from scipy.optimize import least_squares
+from scipy.interpolate import NearestNDInterpolator
 from tqdm import tqdm
 
 from leafs_clippers.leafs import leafs as lc
@@ -256,14 +258,14 @@ class LeafsMapping:
 
     def _guess_boxsize(self, max_vel=0.0, vacuum_threshold=1e-4):
         if max_vel > 0:
-            boxsize = max_vel * self.s.time * 2
+            boxsize = max_vel * self.s.time
         else:
             rad, rho = self.s.get_rad_profile("density")
-            boxsize = np.max(rad[rho > vacuum_threshold]) * 2
+            boxsize = np.max(rad[rho > vacuum_threshold])
 
         if not self.quiet:
             print(
-                f"Boxsize is {boxsize:e}cm, equivalent to {boxsize / self.s.time / 1e5 / 2:.2f} km/s"
+                f"Boxsize is {boxsize:e}cm, equivalent to {boxsize / self.s.time / 1e5:.2f} km/s"
             )
 
         return boxsize
@@ -276,132 +278,37 @@ class LeafsMapping:
         if not self.quiet:
             print("Calculating density field from last hydro snapshot...")
 
-        from scipy.interpolate import LinearNDInterpolator
-
-        x = np.linspace(self.s.geomx[0], self.s.geomx[-1], res)
-        y = np.linspace(self.s.geomy[0], self.s.geomy[-1], res)
-        z = np.linspace(self.s.geomz[0], self.s.geomz[-1], res)
+        x = np.linspace(-self.boxsize, self.boxsize, res)
+        y = np.linspace(-self.boxsize, self.boxsize, res)
+        z = np.linspace(-self.boxsize, self.boxsize, res)
         xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
 
-        interp = LinearNDInterpolator(
-            (self.s.geomx, self.s.geomy, self.s.geomz),
-            self.s.density,
+        XX, YY, ZZ = np.meshgrid(
+            self.s.geomx, self.s.geomy, self.s.geomz, indexing="ij"
         )
-        points = np.array([xx.ravel(), yy.ravel(), zz.ravel()]).T
-
-        return interp(points).reshape((res, res, res))
-
-        rng = np.random.default_rng()
-        x = rng.random(10) - 0.5
-        y = rng.random(10) - 0.5
-        z = np.hypot(x, y)
-        X = np.linspace(min(x), max(x))
-        Y = np.linspace(min(y), max(y))
-        X, Y = np.meshgrid(X, Y)  # 2D grid for interpolation
-        interp = LinearNDInterpolator(list(zip(x, y)), z)
-
-        dims = (res, res, res)
-        ndims = 3
-        offset = (0.5 * self.boxsize, 0.5 * self.boxsize, 0.5 * self.boxsize)
-
-        cellsize = self.boxsize / res
-        rhointp = np.zeros(dims)
-
-        if not self.quiet:
-            print(f"Hydro time: {self.s.time:.2f}s")
-            print(
-                f"Min, max density: {self.s.density.min():.2e}, {self.s.density.max():.2e}"
+        select_mask = np.logical_and.reduce(
+            (
+                XX >= -self.boxsize,
+                XX <= self.boxsize,
+                YY >= -self.boxsize,
+                YY <= self.boxsize,
+                ZZ >= -self.boxsize,
+                ZZ <= self.boxsize,
             )
+        )
+        if self.remove_bound_core:
+            bm = self.s.get_bound_material()
+            select_mask = np.logical_and(select_mask, ~bm)
 
-        indices = np.zeros((np.max(dims), ndims), dtype=int)
-        for dim in range(ndims):
-            hygridpos = [self.s.geomx, self.s.geomy, self.s.geomz][dim]
-            hygridres = [self.s.gnx, self.s.gny, self.s.gnz][dim]
-            hyidx = 0
-            idx = 0
-
-            gridpos = (
-                np.linspace(0, dims[dim] - 1, dims[dim]) + 0.5
-            ) * cellsize - offset[dim]
-            if not self.quiet:
-                print(
-                    f"Dimension {dim}, gridpos: {gridpos.min():.2e}, {gridpos.max():.2e}"
-                )
-
-            while hygridpos[0] > gridpos[idx]:
-                indices[idx, dim] = 1
-                idx += 1
-
-            while idx < dims[dim]:
-                while hygridpos[hyidx] < gridpos[idx] and hyidx < hygridres - 1:
-                    hyidx += 1
-
-                while idx < dims[dim] and (
-                    (hygridpos[hyidx] >= gridpos[idx]) or (hyidx == hygridres - 1)
-                ):
-                    indices[idx, dim] = hyidx
-                    idx += 1
-
-        rho = self.s.data["density"]
-        idxleftx = np.minimum(np.maximum(indices[: dims[0], 0] - 1, 0), self.s.gnx - 1)[
-            :, None, None
-        ] * np.ones(dims, dtype=int)
-        idxrightx = np.minimum(np.maximum(indices[: dims[0], 0], 0), self.s.gnx - 1)[
-            :, None, None
-        ] * np.ones(dims, dtype=int)
-        gridposx = (np.linspace(0, dims[0] - 1, dims[0]) + 0.5) * cellsize - offset[0]
-        facx = (gridposx[:, None, None] - self.s.geomx[idxleftx]) / (
-            self.s.geomx[idxrightx] - self.s.geomx[idxleftx]
+        input_points = np.array(
+            [XX[select_mask].ravel(), YY[select_mask].ravel(), ZZ[select_mask].ravel()]
+        ).T
+        interp = NearestNDInterpolator(
+            input_points,
+            self.s.density[select_mask].ravel(),
         )
 
-        idxlefty = np.minimum(np.maximum(indices[: dims[1], 1] - 1, 0), self.s.gny - 1)[
-            None, :, None
-        ] * np.ones(dims, dtype=int)
-        idxrighty = np.minimum(np.maximum(indices[: dims[1], 1], 0), self.s.gny - 1)[
-            None, :, None
-        ] * np.ones(dims, dtype=int)
-        gridposy = (np.linspace(0, dims[1] - 1, dims[1]) + 0.5) * cellsize - offset[1]
-        facy = (gridposy[None, :, None] - self.s.geomy[idxlefty]) / (
-            self.s.geomy[idxrighty] - self.s.geomy[idxlefty]
-        )
-
-        idxleftz = np.minimum(np.maximum(indices[:, 2] - 1, 0), self.s.gnz - 1)[
-            None, None, :
-        ] * np.ones(dims, dtype=int)
-        idxrightz = np.minimum(np.maximum(indices[:, 2], 0), self.s.gnz - 1)[
-            None, None, :
-        ] * np.ones(dims, dtype=int)
-        gridposz = (np.linspace(0, dims[2] - 1, dims[2]) + 0.5) * cellsize - offset[2]
-        facz = (gridposz[None, None, :] - self.s.geomz[idxleftz]) / (
-            self.s.geomz[idxrightz] - self.s.geomz[idxleftz]
-        )
-
-        y1 = rho[idxleftx, idxlefty, idxleftz] + facx * (
-            rho[idxrightx, idxlefty, idxleftz] - rho[idxleftx, idxlefty, idxleftz]
-        )
-        y2 = rho[idxleftx, idxrighty, idxleftz] + facx * (
-            rho[idxrightx, idxrighty, idxleftz] - rho[idxleftx, idxrighty, idxleftz]
-        )
-
-        y3 = rho[idxleftx, idxlefty, idxrightz] + facx * (
-            rho[idxrightx, idxlefty, idxrightz] - rho[idxleftx, idxlefty, idxrightz]
-        )
-        y4 = rho[idxleftx, idxrighty, idxrightz] + facx * (
-            rho[idxrightx, idxrighty, idxrightz] - rho[idxleftx, idxrighty, idxrightz]
-        )
-
-        z1 = y1 + facy * (y2 - y1)
-        z2 = y3 + facy * (y4 - y3)
-
-        rhointp = z1 + facz * (z2 - z1)
-
-        if not self.quiet:
-            print("Done.")
-            print(
-                f"Rhointp, min={rhointp.min()}, max={rhointp.max()}, av={rhointp.sum() / res**3}, totmass={rhointp.sum() * self.boxsize**3 / res**3 / const.M_SOL}"
-            )
-
-        return rhointp
+        return interp(xx, yy, zz)
 
     def _get_rho_ejecta(self, vacuum_threshold=1e-4, nneighbours=32, res=200):
         try:
@@ -448,6 +355,43 @@ class LeafsMapping:
         )
 
         return sphgrid_aux[:, :, :, 1]
+
+    def _get_expansion_center(self, vacuum_threshold=1e-4):
+        if not self.quiet:
+            print("Centering explosion...")
+
+        def dist(center, xpos, ypos, zpos, velx, vely, velz, time):
+            return np.sqrt(
+                (xpos - velx * time - center[0]) ** 2
+                + (ypos - vely * time - center[1]) ** 2
+                + (zpos - velz * time - center[2]) ** 2
+            )
+
+        bm = self.s.get_bound_material(vacuum_threshold=vacuum_threshold)
+
+        tofit = (
+            ~bm
+            & (self.s.vel_abs > 1e3 * 1e5)
+            & (self.s.vel_abs < 2.5e4 * 1e5)
+            & (self.s.density > vacuum_threshold)
+        )
+        XX, YY, ZZ = np.meshgrid(
+            self.s.geomx, self.s.geomy, self.s.geomz, indexing="ij"
+        )
+        xpos, ypos, zpos = XX[tofit], YY[tofit], ZZ[tofit]
+        velx, vely, velz = self.s.velx[tofit], self.s.vely[tofit], self.s.velz[tofit]
+        bound = self.s.time * 1e4 * 1e5
+        opt = least_squares(
+            dist,
+            [0, 0, 0],
+            args=(xpos, ypos, zpos, velx, vely, velz, s.time),
+            bounds=[np.ones(3) * (-bound), np.ones(3) * bound],
+            verbose=True,
+            jac="3-point",
+        )
+        if not self.quiet:
+            print("Center of expansion: {0}".format(opt.x))
+        return opt.x
 
     def _write_3D_grid(
         self,
@@ -525,13 +469,7 @@ class LeafsMapping:
 
         vol = np.zeros((resx, resy, resz))
 
-        if self.remove_bound_core:
-            rho_ej = self._get_rho_ejecta(
-                vacuum_threshold=vacuum_threshold, nneighbours=nneighbours, res=res
-            )
-            rhogrid = rho_ej
-        else:
-            rhogrid = self.rhointp
+        rhogrid = self.rhointp
 
         rhogrid[rhogrid <= vacuum_threshold] = 0.0
 
@@ -806,6 +744,7 @@ class LeafsMapping:
         res=200,
         vacuum_threshold=1e-4,
         max_vel=0.0,
+        center_expansion=False,
         radioactives=["ni56", "co56", "fe52", "cr48"],
         nneighbours=32,
         write_files=True,
@@ -822,6 +761,8 @@ class LeafsMapping:
             The threshold for vacuum cells. Default: 1e-4.
         max_vel : float, optional
             The maximum velocity to consider. Default: 0.
+        center_expansion : bool, optional
+            Center the box on the expansion center. Default: False.
         radioactives : list, optional
             The list of radioactive isotopes to consider. Default: ["ni56", "co56", "fe52", "cr48"].
         nneighbours : int, optional
@@ -842,6 +783,21 @@ class LeafsMapping:
             raise ImportError("The calcGrid module is required.")
 
         self.boxsize = self._guess_boxsize(max_vel=max_vel)
+        if center_expansion:
+            self.center = self._get_expansion_center(vacuum_threshold=vacuum_threshold)
+        else:
+            self.center = np.array([0.0, 0.0, 0.0])
+
+        # Center data inplace. Overwrites data, probably not ideal,
+        # but it is what it is.
+        self.tracer.fpos[:, 0] -= self.center[0]
+        self.tracer.fpos[:, 1] -= self.center[1]
+        self.tracer.fpos[:, 2] -= self.center[2]
+
+        self.s.geomx -= self.center[0]
+        self.s.geomy -= self.center[1]
+        self.s.geomz -= self.center[2]
+
         self.rhointp = self._get_rhointp(res=res)
 
         forceneighbourcount = 0
