@@ -485,7 +485,7 @@ class LeafsMapping:
         frho = open("model.txt", "w")
         fabund = open("abundances.txt", "w")
 
-        frho.write("%g\n" % (resx * resy * resz))
+        frho.write("%d\n" % (resx * resy * resz))
         frho.write("%g\n" % (self.s.time / (24.0 * 3600)))
 
         if not self.quiet:

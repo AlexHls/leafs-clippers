@@ -90,6 +90,12 @@ def cli():
         default="ONeDef",
         help="The type of LEAFS simulation. Default is 'ONeDef'",
     )
+    parser.add_argument(
+        "-o",
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing mapped files",
+    )
 
     args = parser.parse_args()
 
