@@ -254,11 +254,12 @@ class LeafsMapping:
 
         self.rhointp = None
 
-    def _guess_boxsize(self, max_vel=0):
+    def _guess_boxsize(self, max_vel=0.0, vacuum_threshold=1e-4):
         if max_vel > 0:
             boxsize = max_vel * self.s.time
         else:
-            boxsize = self.s.edgex[-1] - self.s.edgex[0]
+            rad, rho = self.s.get_rad_profile("density")
+            boxsize = np.max(rad[rho > vacuum_threshold])
 
         if not self.quiet:
             print(
