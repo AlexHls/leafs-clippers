@@ -1,3 +1,9 @@
+"""
+LEAFS tracer file reading and processing utilities.
+
+This module provides functions and classes for reading and analyzing
+tracer particle data from LEAFS simulations.
+"""
 import os
 import struct
 
@@ -37,11 +43,41 @@ def get_bound_unbound_ids(
     model="one_def",
     snappath="./output",
     ignore_cache=False,
-    remnant_velocity=[0, 0, 0],
+    remnant_velocity=None,
     qn=6,
     nlset=1,
     writeout=True,
 ):
+    """
+    Identify bound and unbound particles from tracer data.
+    
+    Parameters
+    ----------
+    model : str, optional
+        Model name.
+    snappath : str, optional
+        Path to snapshot files.
+    ignore_cache : bool, optional
+        If True, recalculate even if cache files exist.
+    remnant_velocity : list or None, optional
+        Remnant velocity [vx, vy, vz]. If None, defaults to [0, 0, 0].
+    qn : int, optional
+        Number of reduced species.
+    nlset : int, optional
+        Number of level sets.
+    writeout : bool, optional
+        If True, write results to text files.
+        
+    Returns
+    -------
+    bound : np.ndarray
+        Array of bound particle IDs.
+    unbound : np.ndarray
+        Array of unbound particle IDs.
+    """
+    if remnant_velocity is None:
+        remnant_velocity = [0, 0, 0]
+    
     if not ignore_cache:
         try:
             unbound = np.genfromtxt(f"{snappath}/unbound.txt", dtype=int)
@@ -58,24 +94,21 @@ def get_bound_unbound_ids(
     tp = read_tracer(model=model, snappath=snappath)
     at = tp.last()
 
-    bound = []
-    unbound = []
+    # Vectorized computation instead of loop
     off = 1 + 6 + qn + 2 * nlset
-
-    for i in tqdm(range(tp.npart)):
-        idx = i + 1
-        eint = at.data[5, i]
-        egrav = at.data[off, i]
-        ekin = 0.5 * (
-            (at.data[off + 1, i] - rx) ** 2
-            + (at.data[off + 2, i] - ry) ** 2
-            + (at.data[off + 3, i] - rz) ** 2
-        )
-        etot = eint + egrav + ekin
-        if etot >= 0:
-            unbound.append(idx)
-        if etot < 0:
-            bound.append(idx)
+    indices = np.arange(1, tp.npart + 1)
+    
+    eint = at.data[5, :]
+    egrav = at.data[off, :]
+    ekin = 0.5 * (
+        (at.data[off + 1, :] - rx) ** 2
+        + (at.data[off + 2, :] - ry) ** 2
+        + (at.data[off + 3, :] - rz) ** 2
+    )
+    etot = eint + egrav + ekin
+    
+    unbound = indices[etot >= 0]
+    bound = indices[etot < 0]
 
     if writeout:
         np.savetxt(f"{snappath}/unbound.txt", unbound, fmt="%d")
@@ -83,7 +116,7 @@ def get_bound_unbound_ids(
 
     print("All done.")
 
-    return np.array(bound), np.array(unbound)
+    return bound, unbound
 
 
 class LeafsTracer:
