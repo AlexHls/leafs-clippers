@@ -13,6 +13,7 @@ def main(
     vacuum_threshold=1e-4,
     max_vel=0.0,
     decay_time=0.0,
+    overwrite=False,
 ):
     map = lm.LeafsMapping(
         snappath=snappath,
@@ -27,9 +28,15 @@ def main(
             vacuum_threshold=vacuum_threshold,
             max_vel=max_vel,
             decay_time=decay_time,
+            overwrite=overwrite,
         )
     else:
-        map.map3D(res=res, vacuum_threshold=vacuum_threshold, max_vel=max_vel)
+        map.map3D(
+            res=res,
+            vacuum_threshold=vacuum_threshold,
+            max_vel=max_vel,
+            overwrite=overwrite,
+        )
 
     return
 
@@ -109,6 +116,7 @@ def cli():
         decay_time=args.decay_time,
         model=args.model,
         simulation_type=args.simulation_type,
+        overwrite=args.overwrite,
     )
 
     return
