@@ -256,10 +256,10 @@ class LeafsMapping:
 
     def _guess_boxsize(self, max_vel=0.0, vacuum_threshold=1e-4):
         if max_vel > 0:
-            boxsize = max_vel * self.s.time
+            boxsize = max_vel * self.s.time * 2
         else:
             rad, rho = self.s.get_rad_profile("density")
-            boxsize = np.max(rad[rho > vacuum_threshold])
+            boxsize = np.max(rad[rho > vacuum_threshold]) * 2
 
         if not self.quiet:
             print(
@@ -275,6 +275,30 @@ class LeafsMapping:
 
         if not self.quiet:
             print("Calculating density field from last hydro snapshot...")
+
+        from scipy.interpolate import LinearNDInterpolator
+
+        x = np.linspace(self.s.geomx[0], self.s.geomx[-1], res)
+        y = np.linspace(self.s.geomy[0], self.s.geomy[-1], res)
+        z = np.linspace(self.s.geomz[0], self.s.geomz[-1], res)
+        xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
+
+        interp = LinearNDInterpolator(
+            (self.s.geomx, self.s.geomy, self.s.geomz),
+            self.s.density,
+        )
+        points = np.array([xx.ravel(), yy.ravel(), zz.ravel()]).T
+
+        return interp(points).reshape((res, res, res))
+
+        rng = np.random.default_rng()
+        x = rng.random(10) - 0.5
+        y = rng.random(10) - 0.5
+        z = np.hypot(x, y)
+        X = np.linspace(min(x), max(x))
+        Y = np.linspace(min(y), max(y))
+        X, Y = np.meshgrid(X, Y)  # 2D grid for interpolation
+        interp = LinearNDInterpolator(list(zip(x, y)), z)
 
         dims = (res, res, res)
         ndims = 3
