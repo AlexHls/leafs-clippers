@@ -154,7 +154,7 @@ class NKKWeakRate(AYANNWeakRate):
 
     def extrapolate(self, temp=100):
         # Constant extrapolation
-        self.temp = np.append(self.temp, temp)
+        self.temp = np.concatenate([self.temp, [temp]])
         self.temp_len = 13
         self.lambda1 = util.extrapolate_nkk_aux(self.lambda1)
         self.lambda2 = util.extrapolate_nkk_aux(self.lambda2)
@@ -255,7 +255,7 @@ class ODAWeakRate(AYANNWeakRate):
 
     def extrapolate(self, temp=100):
         # Constant extrapolation
-        self.temp = np.append(self.temp, temp)
+        self.temp = np.concatenate([self.temp, [temp]])
         self.temp_len = 13
         self.lambda1 = util.extrapolate_oda_aux(self.lambda1)
         self.lambda2 = util.extrapolate_oda_aux(self.lambda2)

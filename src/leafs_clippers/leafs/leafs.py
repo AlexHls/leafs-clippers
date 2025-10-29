@@ -666,19 +666,32 @@ class LeafsSnapshot:
         self.data["e_internal"] = np.zeros_like(self.density)
         if self.eos is None:
             print("No EOS available, setting internal energy to zero.")
-        for i in tqdm(range(self.gnx)):
-            for j in range(self.gny):
-                for k in range(self.gnz):
-                    # Ye = zbar / abar => zbar = Ye * abar
-                    abar = self.Amean[i, j, k]
-                    zbar = abar * self.ye[i, j, k]
-                    self.e_internal[i, j, k] = (
-                        self.eos.InternalEnergyFromDensityTemperature(
-                            self.density[i, j, k],
-                            self.temp[i, j, k],
-                            np.array([abar, zbar, np.log10(self.temp[i, j, k])]),
-                        )
-                    )
+            return
+        
+        # Flatten arrays for potentially faster processing
+        shape = self.density.shape
+        density_flat = self.density.flatten()
+        temp_flat = self.temp.flatten()
+        Amean_flat = self.Amean.flatten()
+        ye_flat = self.ye.flatten()
+        e_internal_flat = np.zeros_like(density_flat)
+        
+        # Calculate zbar for all cells at once
+        # Ye = zbar / abar => zbar = Ye * abar
+        zbar_flat = Amean_flat * ye_flat
+        
+        # Process cells in bulk or individually depending on EOS capabilities
+        for i in tqdm(range(len(density_flat))):
+            abar = Amean_flat[i]
+            zbar = zbar_flat[i]
+            e_internal_flat[i] = self.eos.InternalEnergyFromDensityTemperature(
+                density_flat[i],
+                temp_flat[i],
+                np.array([abar, zbar, np.log10(temp_flat[i])]),
+            )
+        
+        # Reshape back to original shape
+        self.e_internal = e_internal_flat.reshape(shape)
 
         # Write internal energy to cache
         if self.write_derived:
@@ -1998,6 +2011,9 @@ class LeafsProtocol:
         for filename in protocol_files:
             j = min(j, int(filename[-9:-6]))
 
+        # Use lists to accumulate data, then convert to arrays at the end
+        proto_lists = {key: [] for key in self.keys}
+        
         filename = os.path.join(self.snappath, self.model + "%03d.bprot" % j)
         while os.path.exists(filename):
             f = open(filename, "rb")
@@ -2012,27 +2028,13 @@ class LeafsProtocol:
                 c = 0
                 for i in range(len(self.keys)):
                     key = self.keys[i]
-                    if key not in self.proto:
-                        if self.keylen[i] > 1:
-                            self.proto[key] = np.reshape(
-                                matrix[c : c + self.keylen[i]], [self.keylen[i], 1]
-                            )
-                        else:
-                            self.proto[key] = matrix[c : c + self.keylen[i]]
+                    data_slice = matrix[c : c + self.keylen[i]]
+                    if self.keylen[i] > 1:
+                        proto_lists[key].append(
+                            np.reshape(data_slice, [self.keylen[i], 1])
+                        )
                     else:
-                        if self.keylen[i] > 1:
-                            self.proto[key] = np.append(
-                                self.proto[key],
-                                np.reshape(
-                                    matrix[c : c + self.keylen[i]], [self.keylen[i], 1]
-                                ),
-                                axis=1,
-                            )
-                        else:
-                            self.proto[key] = np.append(
-                                self.proto[key], matrix[c : c + self.keylen[i]], axis=0
-                            )
-
+                        proto_lists[key].append(data_slice)
                     c = c + self.keylen[i]
 
                 matrix = util.readmatrix(
@@ -2042,6 +2044,16 @@ class LeafsProtocol:
             f.close()
             j += 1
             filename = os.path.join(self.snappath, self.model + "%03d.bprot" % j)
+        
+        # Convert lists to numpy arrays
+        for key in self.keys:
+            if proto_lists[key]:
+                if len(proto_lists[key][0].shape) > 1:
+                    # Multi-dimensional data
+                    self.proto[key] = np.concatenate(proto_lists[key], axis=1)
+                else:
+                    # 1D data
+                    self.proto[key] = np.concatenate(proto_lists[key], axis=0)
 
         if j == 0:
             raise FileNotFoundError("No protocol files found.")
@@ -2145,30 +2157,23 @@ class FlameProtocol:
         percentiles = {
             "time": self.time,
         }
-        for p in [0.13, 50.0, 99.87]:
-            percentiles[f"vburn_{p}"] = []
-            percentiles[f"vturb_{p}"] = []
-            percentiles[f"machrise_{p}"] = []
-            percentiles[f"vburn_mach_{p}"] = []
-            percentiles[f"vturb_mach_{p}"] = []
+        
+        # Pre-allocate arrays for better performance
+        percentile_values = [0.13, 50.0, 99.87]
+        for p in percentile_values:
+            percentiles[f"vburn_{p}"] = np.empty(self.n_tsteps)
+            percentiles[f"vturb_{p}"] = np.empty(self.n_tsteps)
+            percentiles[f"machrise_{p}"] = np.empty(self.n_tsteps)
+            percentiles[f"vburn_mach_{p}"] = np.empty(self.n_tsteps)
+            percentiles[f"vturb_mach_{p}"] = np.empty(self.n_tsteps)
 
         for i in range(self.n_tsteps):
-            for p in [0.13, 50.0, 99.87]:
-                percentiles[f"vburn_{p}"].append(
-                    self.vburn_histgrs[i].percentile(p / 100)
-                )
-                percentiles[f"vturb_{p}"].append(
-                    self.vturb_histgrs[i].percentile(p / 100)
-                )
-                percentiles[f"machrise_{p}"].append(
-                    self.machrise_histgrs[i].percentile(p / 100)
-                )
-                percentiles[f"vburn_mach_{p}"].append(
-                    self.vburn_mach_histgrs[i].percentile(p / 100)
-                )
-                percentiles[f"vturb_mach_{p}"].append(
-                    self.vturb_mach_histgrs[i].percentile(p / 100)
-                )
+            for p in percentile_values:
+                percentiles[f"vburn_{p}"][i] = self.vburn_histgrs[i].percentile(p / 100)
+                percentiles[f"vturb_{p}"][i] = self.vturb_histgrs[i].percentile(p / 100)
+                percentiles[f"machrise_{p}"][i] = self.machrise_histgrs[i].percentile(p / 100)
+                percentiles[f"vburn_mach_{p}"][i] = self.vburn_mach_histgrs[i].percentile(p / 100)
+                percentiles[f"vturb_mach_{p}"][i] = self.vturb_mach_histgrs[i].percentile(p / 100)
 
         self.percentiles = pd.DataFrame(percentiles)
 
