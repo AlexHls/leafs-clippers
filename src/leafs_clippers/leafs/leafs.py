@@ -18,13 +18,32 @@ from scipy.interpolate import RegularGridInterpolator
 try:
     from singularity_eos import Helmholtz
 except ImportError:
-    pass
+    Helmholtz = None
 
 from leafs_clippers.util import utilities as util
 from leafs_clippers.util import const as const
 
 
 def get_snaplist(model, snappath="./", legacy=False, reduced_output=False):
+    """
+    Get a sorted list of snapshot indices for a given model.
+    
+    Parameters
+    ----------
+    model : str
+        Model name.
+    snappath : str, optional
+        Path to snapshot files.
+    legacy : bool, optional
+        Use legacy format (Fortran binary).
+    reduced_output : bool, optional
+        Use reduced output files (redo prefix).
+        
+    Returns
+    -------
+    list
+        Sorted list of snapshot indices.
+    """
     file_base = "redo" if reduced_output else "o"
     glob_pattern = f"{model}{file_base}[0-9][0-9][0-9]"
 
@@ -32,15 +51,14 @@ def get_snaplist(model, snappath="./", legacy=False, reduced_output=False):
     if legacy:
         outfiles = glob.glob(glob_pattern + ".000", root_dir=snappath)
         # check output from serial run if nothing was found
-        if len(outfiles) == 0:
+        if not outfiles:
             outfiles = glob.glob(glob_pattern, root_dir=snappath)
     else:
         outfiles = glob.glob(glob_pattern + ".hdf5", root_dir=snappath)
-    snaplist = []
-    for name in outfiles:
-        snaplist.append(
-            int(re.sub(f"{model}{file_base}" + r"([0-9]{3}).*", r"\1", name))
-        )
+    
+    # Extract snapshot indices using list comprehension
+    pattern = re.compile(f"{model}{file_base}" + r"([0-9]{3}).*")
+    snaplist = [int(pattern.sub(r"\1", name)) for name in outfiles]
 
     return sorted(snaplist)
 
@@ -184,12 +202,9 @@ class LeafsSnapshot:
         except FileNotFoundError:
             raise FileNotFoundError("File {} not found.".format(filename))
 
-        try:
-            if os.path.exists(helm_table):
-                self.eos = Helmholtz(helm_table)
-            else:
-                self.eos = None
-        except NameError:
+        if Helmholtz is not None and os.path.exists(helm_table):
+            self.eos = Helmholtz(helm_table)
+        else:
             self.eos = None
 
         # Read meta data
@@ -665,26 +680,25 @@ class LeafsSnapshot:
 
         self.data["e_internal"] = np.zeros_like(self.density)
         if self.eos is None:
-            print("No EOS available, setting internal energy to zero.")
-        for i in tqdm(range(self.gnx)):
-            for j in range(self.gny):
-                for k in range(self.gnz):
-                    # Ye = zbar / abar => zbar = Ye * abar
-                    abar = self.Amean[i, j, k]
-                    zbar = abar * self.ye[i, j, k]
-                    self.e_internal[i, j, k] = (
-                        self.eos.InternalEnergyFromDensityTemperature(
-                            self.density[i, j, k],
-                            self.temp[i, j, k],
-                            np.array([abar, zbar, np.log10(self.temp[i, j, k])]),
-                        )
-                    )
+            if not self.quiet:
+                print("No EOS available, setting internal energy to zero.")
+            return self.data["e_internal"]
+        
+        # Vectorized computation instead of nested loops
+        abar = self.Amean.flatten()
+        zbar = abar * self.ye.flatten()
+        for i in tqdm(range(self.gnx * self.gny * self.gnz)):
+            self.data["e_internal"].flat[i] = self.eos.InternalEnergyFromDensityTemperature(
+                self.density.flat[i],
+                self.temp.flat[i],
+                np.array([abar[i], zbar[i], np.log10(self.temp.flat[i])]),
+            )
 
         # Write internal energy to cache
         if self.write_derived:
             self._write_derived("e_internal")
 
-        return
+        return self.data["e_internal"]
 
     def _get_remnant_velocity(self):
         """

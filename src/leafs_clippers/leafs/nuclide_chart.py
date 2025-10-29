@@ -1,3 +1,9 @@
+"""
+Nuclide chart visualization and analysis utilities.
+
+This module provides tools for creating and visualizing nuclide charts
+from nuclear composition data.
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -41,26 +47,40 @@ STABLE_N = np.array([  0,   1,   1,   2,   3,   4,   5,   5,   6,   6,   7,   7,
 
 
 class NuclideChart:
+    """
+    Nuclide chart representation for nuclear composition data.
+    
+    Parameters
+    ----------
+    p : object
+        Particle object containing isotope data with attributes:
+        - a : mass numbers
+        - z : proton numbers
+        - xiso() : isotope mass fractions
+        - dm() : particle masses
+    """
     def __init__(self, p):
         self.p = p
         self.n = p.a - p.z
         self.z = p.z
         self.a = p.a
 
-        self.n_unique = sorted(list(set(self.n)))
-        self.z_unique = sorted(list(set(self.z)))
+        # Use numpy unique instead of set conversion for consistency
+        self.n_unique = sorted(np.unique(self.n).tolist())
+        self.z_unique = sorted(np.unique(self.z).tolist())
 
         self.zuq = np.unique(self.z)
         self.nuq = np.unique(self.n)
 
-        self.n_grid = np.zeros(len(self.n_unique) + 1)
-        self.z_grid = np.zeros(len(self.z_unique) + 1)
-        for i in range(len(self.n_unique)):
-            self.n_grid[i] = self.n_unique[i] - 0.5
-        self.n_grid[-1] = self.n_unique[-1] + 0.5
-        for i in range(len(self.z_unique)):
-            self.z_grid[i] = self.z_unique[i] - 0.5
-        self.z_grid[-1] = self.z_unique[-1] + 0.5
+        # Vectorized grid construction
+        self.n_grid = np.concatenate([
+            np.array(self.n_unique) - 0.5,
+            [self.n_unique[-1] + 0.5]
+        ])
+        self.z_grid = np.concatenate([
+            np.array(self.z_unique) - 0.5,
+            [self.z_unique[-1] + 0.5]
+        ])
 
     def get_xiso(self, pnum=None, pnum_mask=None):
         if pnum_mask is not None:
@@ -80,17 +100,30 @@ class NuclideChart:
 
     def map_xiso_to_grid(self, xiso, cutoff=1e-15):
         """
-        Map the xiso to a grid of n and z values
+        Map the xiso to a grid of n and z values.
+        
+        Parameters
+        ----------
+        xiso : array_like
+            Isotope mass fractions.
+        cutoff : float, optional
+            Minimum value to display (values below are masked).
+            
+        Returns
+        -------
+        np.ma.MaskedArray
+            2D grid of isotope abundances.
         """
-
         # Create the grid
         grid = np.zeros((len(self.n_unique), len(self.z_unique)))
 
-        # Fill the grid
-        for i in range(len(xiso)):
-            n_idx = self.n_unique.index(self.n[i])
-            z_idx = self.z_unique.index(self.z[i])
-            grid[n_idx, z_idx] = xiso[i]
+        # Create index mappings for faster lookup
+        n_to_idx = {n: i for i, n in enumerate(self.n_unique)}
+        z_to_idx = {z: i for i, z in enumerate(self.z_unique)}
+        
+        # Fill the grid using vectorized indexing where possible
+        for i, (n_val, z_val, x_val) in enumerate(zip(self.n, self.z, xiso)):
+            grid[n_to_idx[n_val], z_to_idx[z_val]] = x_val
 
         # Apply threshold
         if cutoff is not None:
