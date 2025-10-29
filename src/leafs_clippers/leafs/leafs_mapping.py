@@ -384,7 +384,7 @@ class LeafsMapping:
         opt = least_squares(
             dist,
             [0, 0, 0],
-            args=(xpos, ypos, zpos, velx, vely, velz, s.time),
+            args=(xpos, ypos, zpos, velx, vely, velz, self.s.time),
             bounds=[np.ones(3) * (-bound), np.ones(3) * bound],
             verbose=True,
             jac="3-point",
