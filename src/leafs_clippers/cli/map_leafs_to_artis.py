@@ -14,12 +14,14 @@ def main(
     max_vel=0.0,
     decay_time=0.0,
     overwrite=False,
+    remove_bound_core=True,
 ):
     map = lm.LeafsMapping(
         snappath=snappath,
         tppnppath=tppnppath,
         model=model,
         simulation_type=simulation_type,
+        remove_bound_core=remove_bound_core,
     )
 
     if one_dim:
@@ -103,6 +105,11 @@ def cli():
         action="store_true",
         help="Overwrite existing mapped files",
     )
+    parser.add_argument(
+        "--no_remove_bound_core",
+        action="store_false",
+        help="Do not remove the bound core from the mapping",
+    )
 
     args = parser.parse_args()
 
@@ -117,6 +124,7 @@ def cli():
         model=args.model,
         simulation_type=args.simulation_type,
         overwrite=args.overwrite,
+        remove_bound_core=args.no_remove_bound_core,
     )
 
     return
