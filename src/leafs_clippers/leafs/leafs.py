@@ -1952,7 +1952,7 @@ class LeafsLegacySnapshot(LeafsSnapshot):
             for i, label in enumerate(meta_label):
                 f.attrs[label] = meta[i]
 
-            for k in list(self.data.keys()):
+            for k in self.data.keys():
                 dset = f.create_dataset(
                     k, self.data[k].shape, dtype=str(self.data[k].dtype)
                 )
