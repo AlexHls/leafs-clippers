@@ -181,11 +181,11 @@ class TestGetAbarZbar:
         
         abar, zbar = get_abar_zbar(xnuc, species)
         
-        # he4: X/A = 0.5/4 = 0.125
-        # c12: X/A = 0.5/12 = 0.04167
+        # he4: X/A = 0.5/4 = 0.125, Z*(X/A) = 2*0.125 = 0.25
+        # c12: X/A = 0.5/12 = 0.04167, Z*(X/A) = 6*0.04167 = 0.25
         # sum(X/A) = 0.16667
         # abar = sum(X) / sum(X/A) = 1.0 / 0.16667 = 6
-        # zbar = (2*0.125 + 6*0.04167) / 0.16667 * 6 = 3
+        # zbar = sum(Z*X/A) / sum(X/A) = (0.25 + 0.25) / 0.16667 = 3
         
         assert np.isclose(abar, 6.0)
         assert np.isclose(zbar, 3.0)
@@ -215,7 +215,7 @@ class TestLazyDict:
         assert 'key1' in lazy_dict
         assert 'key2' in lazy_dict
         
-        # Test that keys are initially None (not loaded yet)
+        # Test that keys are set but not loaded yet (lazy loading)
         assert lazy_dict._keys == keys
         assert 'key1' not in lazy_dict._loaded_keys
         assert 'key2' not in lazy_dict._loaded_keys

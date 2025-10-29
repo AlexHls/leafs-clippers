@@ -174,7 +174,7 @@ class TestLeafsXdmf3Writer:
             content = f.read()
         
         assert '<Geometry GeometryType="VXVYVZ">' in content
-        # For 2D, order is different (y, x, z)
+        # In 2D mode, the writer outputs edgey first, then edgex
         assert 'test.hdf5:/edgey' in content
         assert 'test.hdf5:/edgex' in content
         assert 'test.hdf5:/edgez' in content
