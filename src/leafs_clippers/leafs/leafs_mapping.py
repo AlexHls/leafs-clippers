@@ -458,14 +458,14 @@ class LeafsMapping:
         frho.write("%g\n" % (self.s.time / (24.0 * 3600)))
 
         if not self.quiet:
-            print(f"Velocity: {0.5 * boxy / self.s.time / 1e5:.2f} km/s")
+            print(f"Velocity: {boxy / self.s.time / 1e5:.2f} km/s")
 
-        frho.write("%g\n" % (0.5 * boxy / self.s.time))
+        frho.write("%g\n" % (boxy / self.s.time))
 
         cellcount = 0
-        xcellsize = boxx / resx
-        ycellsize = boxy / resy
-        zcellsize = boxz / resz
+        xcellsize = 2 * boxx / resx
+        ycellsize = 2 * boxy / resy
+        zcellsize = 2 * boxz / resz
 
         vol = np.zeros((resx, resy, resz))
 
@@ -474,11 +474,11 @@ class LeafsMapping:
         rhogrid[rhogrid <= vacuum_threshold] = 0.0
 
         for k in range(resz):
-            cellz = (k + 0.5) * zcellsize - 0.5 * boxz + cz
+            cellz = (k + 0.5) * zcellsize - boxz + cz
             for j in range(resy):
-                celly = (j + 0.5) * ycellsize - 0.5 * boxy + cy
+                celly = (j + 0.5) * ycellsize - boxy + cy
                 for i in range(resx):
-                    cellx = (i + 0.5) * xcellsize - 0.5 * boxx + cx
+                    cellx = (i + 0.5) * xcellsize - boxx + cx
 
                     vol[i, j, k] = xcellsize * ycellsize * zcellsize
 
