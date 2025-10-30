@@ -810,9 +810,9 @@ class LeafsMapping:
             print(f"NNeighbours: {nneighbours}.")
 
         (ttt,) = np.where(
-            (np.abs(self.tracer.fpos[:, 0]) < 0.5 * self.boxsize)
-            & (np.abs(self.tracer.fpos[:, 1]) < 0.5 * self.boxsize)
-            & (np.abs(self.tracer.fpos[:, 2]) < 0.5 * self.boxsize)
+            (np.abs(self.tracer.fpos[:, 0]) < self.boxsize)
+            & (np.abs(self.tracer.fpos[:, 1]) < self.boxsize)
+            & (np.abs(self.tracer.fpos[:, 2]) < self.boxsize)
         )
 
         if not self.quiet:
