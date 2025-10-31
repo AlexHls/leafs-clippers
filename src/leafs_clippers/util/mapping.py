@@ -66,8 +66,57 @@ def _remap_3d(Lx, Ly, Lz, src_data):
     return result
 
 
+@njit
+def _merge_2d(src_mass, dst_shape, merge):
+    DST_H = dst_shape[0]
+    DST_W = dst_shape[1]
+    MERGE_H = merge[0]
+    MERGE_W = merge[1]
+
+    total_dst = np.zeros(dst_shape, dtype=np.float64)
+    for W in prange(DST_W):
+        for H in prange(DST_H):
+            sum_val = 0.0
+            for MW in range(MERGE_W):
+                for MH in range(MERGE_H):
+                    src_mass_row = W * MERGE_H + MH
+                    src_mass_col = H * MERGE_W + MW
+
+                    sum_val += src_mass[src_mass_row, src_mass_col]
+
+            total_dst[W, H] = sum_val
+    return total_dst
+
+
+@njit(parallel=True)
+def _merge_3d(src_mass, dst_shape, merge):
+    DST_X = dst_shape[0]
+    DST_Y = dst_shape[1]
+    DST_Z = dst_shape[2]
+    MERGE_X = merge[0]
+    MERGE_Y = merge[1]
+    MERGE_Z = merge[2]
+
+    total_dst = np.zeros(dst_shape, dtype=np.float64)
+    for Z in prange(DST_Z):
+        for Y in prange(DST_Y):
+            for X in prange(DST_X):
+                sum_val = 0.0
+                for MZ in range(MERGE_Z):
+                    for MY in range(MERGE_Y):
+                        for MX in range(MERGE_X):
+                            src_mass_x = X * MERGE_X + MX
+                            src_mass_y = Y * MERGE_Y + MY
+                            src_mass_z = Z * MERGE_Z + MZ
+
+                            sum_val += src_mass[src_mass_x, src_mass_y, src_mass_z]
+
+                total_dst[X, Y, Z] = sum_val
+    return total_dst
+
+
 class ConservativeRemap:
-    def __init__(self, src_edges, dst_shape, method="indirect"):
+    def __init__(self, src_edges, dst_shape, method="direct"):
         """
         Conservative downsampling from a fine rectilinear grid (2D or 3D)
         to a coarser rectilinear grid, conserving quantities such as
@@ -254,15 +303,7 @@ class SimpleConservativeRemap:
         return total_dst / self.dst_volumes
 
     def _remap_2d(self, src_mass):
-        total_dst = np.zeros(self.dst_shape, dtype=np.float64)
-        for y, x, yy, xx in itertools.product(
-            range(self.dst_shape[0]),
-            range(self.dst_shape[1]),
-            range(self.merge[0]),
-            range(self.merge[1]),
-        ):
-            total_dst[x, y] += src_mass[x * self.merge[0] + xx, y * self.merge[1] + yy]
-
+        total_dst = _merge_2d(src_mass, self.dst_shape, self.merge)
         return total_dst
 
     def _remap_3d(self, src_mass):
