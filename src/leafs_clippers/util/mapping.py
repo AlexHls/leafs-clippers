@@ -1,5 +1,6 @@
 import numpy as np
 from numba import njit, prange
+import itertools
 
 
 @njit
@@ -11,7 +12,7 @@ def _compute_overlap_matrix(src_edges, dst_edges):
     """
     n_src = len(src_edges) - 1
     n_dst = len(dst_edges) - 1
-    L = np.zeros((n_dst, n_src), dtype=float)
+    L = np.zeros((n_dst, n_src), dtype=np.float64)
     for i_dst in range(n_dst):
         d0, d1 = dst_edges[i_dst], dst_edges[i_dst + 1]
         for i_src in range(n_src):
@@ -66,7 +67,7 @@ def _remap_3d(Lx, Ly, Lz, src_data):
 
 
 class ConservativeRemap:
-    def __init__(self, src_edges, dst_shape):
+    def __init__(self, src_edges, dst_shape, method="indirect"):
         """
         Conservative downsampling from a fine rectilinear grid (2D or 3D)
         to a coarser rectilinear grid, conserving quantities such as
@@ -79,6 +80,9 @@ class ConservativeRemap:
             It is assumed that len(src_edges) = dim
         dst_shape : tuple of int
             Shape of the destination grid.
+        method : str, optional
+            If "direct", use direct geometric overlap computation. If "indirect",
+            first remap to an intermediate grid, merging cells to reduce computation.
         """
 
         self.dim = len(src_edges)
@@ -89,12 +93,22 @@ class ConservativeRemap:
                 "dst_shape must have the same number of dimensions as src_edges."
             )
 
-        self.src_edges = src_edges
+        if method not in ("direct", "indirect"):
+            raise ValueError('method must be either "direct" or "indirect".')
+
+        if method == "indirect":
+            _dst_shape = self._get_intermediate_shape(src_edges, dst_shape)
+            self.indirect_mapper = SimpleConservativeRemap(src_edges, _dst_shape)
+            self.src_edges = self.indirect_mapper.dst_edges
+        else:
+            self.indirect_mapper = None
+            self.src_edges = src_edges
+
         self.dst_shape = dst_shape
         self.dst_edges, self.dst_volumes = self._get_dst_edges()
 
         self.L_mats = [
-            _compute_overlap_matrix(src_edges[i], self.dst_edges[i])
+            _compute_overlap_matrix(self.src_edges[i], self.dst_edges[i])
             for i in range(self.dim)
         ]
 
@@ -117,6 +131,16 @@ class ConservativeRemap:
             )
         return dst_edges, dst_volumes
 
+    def _get_intermediate_shape(self, src_edges, dst_shape):
+        _dst_shape = []
+        for i in range(self.dim):
+            src_n = len(src_edges[i]) - 1
+            dst_n = src_n
+            while dst_n // 2 >= dst_shape[i]:
+                dst_n //= 2
+            _dst_shape.append(dst_n)
+        return tuple(_dst_shape)
+
     def _remap_2d(self, src_data):
         Lx, Ly = self.L_mats
         return _remap_2d(Lx, Ly, src_data)
@@ -131,8 +155,128 @@ class ConservativeRemap:
                 "src_data must have the same number of dimensions as src_edges."
             )
 
-        if self.dim == 2:
-            total_dst = self._remap_2d(src_data)
+        if self.indirect_mapper is not None:
+            _src_data = self.indirect_mapper.remap(src_data)
         else:
-            total_dst = self._remap_3d(src_data)
+            _src_data = src_data.astype(np.float64)
+
+        if self.dim == 2:
+            total_dst = self._remap_2d(_src_data)
+        else:
+            total_dst = self._remap_3d(_src_data)
         return total_dst / self.dst_volumes
+
+
+class SimpleConservativeRemap:
+    def __init__(self, src_edges, dst_shape):
+        """
+        A simple conservative remapper that simply merges neighboring cells.
+        Input resolution must be an integer multiple of output resolution.
+
+        Parameters
+        ----------
+        src_edges : tuple of np.ndarray
+            Tuple of 1D arrays defining the edges of the source grid in each dimension.
+            It is assumed that len(src_edges) = dim
+        dst_shape : tuple of int
+            Shape of the destination grid.
+        """
+
+        self.dim = len(src_edges)
+        if self.dim not in (2, 3):
+            raise ValueError("Only 2D and 3D grids are supported.")
+        if len(dst_shape) != self.dim:
+            raise ValueError(
+                "dst_shape must have the same number of dimensions as src_edges."
+            )
+
+        if np.any(
+            [(len(src_edges[i]) - 1) % dst_shape[i] != 0 for i in range(self.dim)]
+        ):
+            print([len(src_edges[i]) - 1 for i in range(self.dim)])
+            print(dst_shape)
+            raise ValueError(
+                "Fine resolution must be an integer multiple of coarse resolution."
+            )
+
+        self.src_edges = src_edges
+        self.dst_shape = dst_shape
+        self.merge = [(len(src_edges[i]) - 1) // dst_shape[i] for i in range(self.dim)]
+        self.dst_edges, self.dst_volumes = self._get_dst_edges()
+        self.src_volumes = self._get_src_volumes()
+
+    def _get_dst_edges(self):
+        # Compute edges
+        dst_edges = np.empty(self.dim, dtype=object)
+        for i in range(self.dim):
+            dst_edges[i] = self.src_edges[i][:: self.merge[i]]
+
+        # Compute volumes
+        dst_deltas = [np.diff(edges) for edges in dst_edges]
+        if self.dim == 2:
+            dst_volumes = np.outer(dst_deltas[0], dst_deltas[1])
+        else:
+            dst_volumes = (
+                dst_deltas[0][:, None, None]
+                * dst_deltas[1][None, :, None]
+                * dst_deltas[2][None, None, :]
+            )
+        return dst_edges, dst_volumes
+
+    def _get_src_volumes(self):
+        if self.dim == 2:
+            return (
+                np.diff(self.src_edges[0])[:, None]
+                * np.diff(self.src_edges[1])[None, :]
+            )
+        else:
+            return (
+                np.diff(self.src_edges[0])[:, None, None]
+                * np.diff(self.src_edges[1])[None, :, None]
+                * np.diff(self.src_edges[2])[None, None, :]
+            )
+
+    def remap(self, src_data):
+        if src_data.ndim != self.dim:
+            raise ValueError(
+                "src_data must have the same number of dimensions as src_edges."
+            )
+
+        _src_data = src_data.astype(np.float64)
+
+        src_mass = _src_data * self.src_volumes
+
+        if self.dim == 2:
+            total_dst = self._remap_2d(src_mass)
+        else:
+            total_dst = self._remap_3d(src_mass)
+
+        return total_dst / self.dst_volumes
+
+    def _remap_2d(self, src_mass):
+        total_dst = np.zeros(self.dst_shape, dtype=np.float64)
+        for y, x, yy, xx in itertools.product(
+            range(self.dst_shape[0]),
+            range(self.dst_shape[1]),
+            range(self.merge[0]),
+            range(self.merge[1]),
+        ):
+            total_dst[x, y] += src_mass[x * self.merge[0] + xx, y * self.merge[1] + yy]
+
+        return total_dst
+
+    def _remap_3d(self, src_mass):
+        total_dst = np.zeros(self.dst_shape, dtype=np.float64)
+        for z, y, x, zz, yy, xx in itertools.product(
+            range(self.dst_shape[0]),
+            range(self.dst_shape[1]),
+            range(self.dst_shape[2]),
+            range(self.merge[0]),
+            range(self.merge[1]),
+            range(self.merge[2]),
+        ):
+            total_dst[x, y, z] += src_mass[
+                x * self.merge[0] + xx, y * self.merge[1] + yy, z * self.merge[2] + zz
+            ]
+
+        return total_dst
