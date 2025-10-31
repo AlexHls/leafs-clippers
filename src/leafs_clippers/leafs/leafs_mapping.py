@@ -10,6 +10,7 @@ from leafs_clippers.leafs import leafs_tracer as lt
 from leafs_clippers.util import const as const
 from leafs_clippers.util import utilities as util
 from leafs_clippers.util import radioactivedecay as lrd
+from leafs_clippers.util import mapping as lm
 
 
 def read_1d_artis_model(root_dir=".", nradioactives=4, max_element=30):
@@ -270,91 +271,85 @@ class LeafsMapping:
 
         return boxsize
 
-    def _get_rhointp(self, res=200):
+    def _get_rhointp(self, rho, bm, res=200, idx_clip=None):
         """
-        Get the density field for the LEAFS model.
+        Perform nearest neighbour interpolation of the density field
+        to fill in the holes left by removing the bound core.
         """
 
         if not self.quiet:
-            print("Calculating density field from last hydro snapshot...")
+            print("Interpolating density field to fill the removed bound core...")
 
         x = np.linspace(-self.boxsize, self.boxsize, res)
         y = np.linspace(-self.boxsize, self.boxsize, res)
         z = np.linspace(-self.boxsize, self.boxsize, res)
         xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
 
-        XX, YY, ZZ = np.meshgrid(
-            self.s.geomx, self.s.geomy, self.s.geomz, indexing="ij"
-        )
-        select_mask = np.logical_and.reduce(
-            (
-                XX >= -self.boxsize,
-                XX <= self.boxsize,
-                YY >= -self.boxsize,
-                YY <= self.boxsize,
-                ZZ >= -self.boxsize,
-                ZZ <= self.boxsize,
-            )
-        )
-        if self.remove_bound_core:
-            bm = self.s.get_bound_material()
-            select_mask = np.logical_and(select_mask, ~bm)
-
-        input_points = np.array(
-            [XX[select_mask].ravel(), YY[select_mask].ravel(), ZZ[select_mask].ravel()]
-        ).T
+        input_points = np.array([xx[~bm].ravel(), yy[~bm].ravel(), zz[~bm].ravel()]).T
         interp = NearestNDInterpolator(
             input_points,
-            self.s.density[select_mask].ravel(),
+            rho[~bm].ravel(),
         )
 
         return interp(xx, yy, zz)
 
-    def _get_rho_ejecta(self, vacuum_threshold=1e-4, nneighbours=32, res=200):
-        try:
-            import calcGrid
-        except ImportError:
-            raise ImportError("The calcGrid module is required.")
+    def _get_rho_ejecta(self, res=200, vacuum_threshold=1e-4):
+        if not self.quiet:
+            print("Calculating ejecta density field...")
 
-        unbound_mask = np.logical_not(
-            self.s.get_bound_material(vacuum_threshold=vacuum_threshold)
+        # Step 1: reduce the LEAFS density field (and total energy field if the
+        # bound rmnant should removed) to the 2^n cells closest to the set boxsize.
+        # In necessary, adjust boxsize to match 2^n cells.
+
+        xinds = np.where(np.abs(self.s.geomx) < self.boxsize)[0]
+        yinds = np.where(np.abs(self.s.geomy) < self.boxsize)[0]
+        zinds = np.where(np.abs(self.s.geomz) < self.boxsize)[0]
+
+        # Ensure even number of cells
+        xinds = xinds[:-1] if len(xinds) % 2 != 0 else xinds
+        yinds = yinds[:-1] if len(yinds) % 2 != 0 else yinds
+        zinds = zinds[:-1] if len(zinds) % 2 != 0 else zinds
+
+        # Edges indices need to be one longer than cell indices
+        x_ei = np.append(xinds, xinds[-1] + 1)
+        y_ei = np.append(yinds, yinds[-1] + 1)
+        z_ei = np.append(zinds, zinds[-1] + 1)
+
+        # Step 2: remap to the low-res grid
+        mapper = lm.ConservativeRemap(
+            (self.s.edgex[x_ei], self.s.edgey[y_ei], self.s.edgez[z_ei]),
+            (res, res, res),
+            method="indirect",
         )
 
-        rhoa = np.array(self.s.data["density"][unbound_mask], dtype=np.float64)
-        vxa = np.array(self.s.data["velx"][unbound_mask], dtype=np.float64)
-        vya = np.array(self.s.data["vely"][unbound_mask], dtype=np.float64)
-        vza = np.array(self.s.data["velz"][unbound_mask], dtype=np.float64)
+        rho_ejecta = mapper.remap(self.s.density[xinds, yinds, zinds])
 
-        fpos = (
-            np.array(
-                [self.s.time * vxa, self.s.time * vya, self.s.time * vza],
-                dtype=np.float64,
+        # Step 3: remove bound remnant if necessary
+        if self.remove_bound_core:
+            # Recompute the bound mass for the coarse grid
+            remnant_velx, remnant_vely, remnant_velz = self.s._get_remnant_velocity()
+            ekin = 0.5 * (
+                (self.s.velx - remnant_velx) ** 2
+                + (self.s.vely - remnant_vely) ** 2
+                + (self.s.velz - remnant_velz) ** 2
             )
-        ).T
-        mass = rhoa * self.s.data["vol"][unbound_mask]
 
-        sphgrid_aux = calcGrid.gatherAbundGrid(
-            fpos,
-            mass,
-            rhoa,
-            np.zeros([rhoa.size, 1]),
-            nneighbours,
-            res,
-            res,
-            res,
-            self.boxsize,
-            self.boxsize,
-            self.boxsize,
-            0,
-            0,
-            0,
-            densitycut=vacuum_threshold,
-            densityfield=self.rhointp,
-            forceneighbourcount=0,
-            single_precision=False,
-        )
+            etot = self.s.egrav + ekin + self.s.energy
 
-        return sphgrid_aux[:, :, :, 1]
+            etot_ejecta = mapper.remap(
+                etot[xinds, yinds, zinds] * self.s.density[xinds, yinds, zinds]
+            )
+
+            # Convert etot_ejecta from erg/cm^3 to erg
+            etot_ejecta *= mapper.dst_volumes
+
+            bm = np.logical_and(etot_ejecta < 0.0 and rho_ejecta > vacuum_threshold)
+
+            rho_ejecta = self._get_rhointp(
+                rho_ejecta, bm, res=res, idx_clip=[xinds, yinds, zinds]
+            )
+
+        return rho_ejecta
 
     def _get_expansion_center(self, vacuum_threshold=1e-4):
         if not self.quiet:
@@ -798,7 +793,7 @@ class LeafsMapping:
         self.s.geomy -= self.center[1]
         self.s.geomz -= self.center[2]
 
-        self.rhointp = self._get_rhointp(res=res)
+        self.rhointp = self._get_rho_ejecta(res=res, vacuum_threshold=vacuum_threshold)
 
         forceneighbourcount = 0
 
