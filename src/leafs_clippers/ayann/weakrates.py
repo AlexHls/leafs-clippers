@@ -90,12 +90,12 @@ class AYANNWeakRates:
             self.rates[rate.get_input_output()] = AYANNWeakRate(rate)
 
     def print_rates(self):
-        for rate in list(self.rates.keys()):
+        for rate in self.rates.keys():
             print(rate)
         return
 
     def get_rates(self):
-        return [self.rates[r] for r in list(self.rates.keys())]
+        return [self.rates[r] for r in self.rates.keys()]
 
     def write_rates(self, filename):
         with open(filename, "w") as f:
@@ -154,7 +154,7 @@ class NKKWeakRate(AYANNWeakRate):
 
     def extrapolate(self, temp=100):
         # Constant extrapolation
-        self.temp = np.append(self.temp, temp)
+        self.temp = np.concatenate([self.temp, [temp]])
         self.temp_len = 13
         self.lambda1 = util.extrapolate_nkk_aux(self.lambda1)
         self.lambda2 = util.extrapolate_nkk_aux(self.lambda2)
@@ -180,11 +180,11 @@ class NKKWeakRates(AYANNWeakRates):
             self.rates[rate.get_input_output()] = rate
 
     def extrapolate(self, temp=100):
-        for rate in list(self.rates.keys()):
+        for rate in self.rates.keys():
             self.rates[rate].extrapolate(temp)
 
     def print_rates(self):
-        for rate in list(self.rates.keys()):
+        for rate in self.rates.keys():
             print(rate)
         return
 
@@ -255,7 +255,7 @@ class ODAWeakRate(AYANNWeakRate):
 
     def extrapolate(self, temp=100):
         # Constant extrapolation
-        self.temp = np.append(self.temp, temp)
+        self.temp = np.concatenate([self.temp, [temp]])
         self.temp_len = 13
         self.lambda1 = util.extrapolate_oda_aux(self.lambda1)
         self.lambda2 = util.extrapolate_oda_aux(self.lambda2)
@@ -288,11 +288,11 @@ class ODAWeakRates(AYANNWeakRates):
                 self.rates[rate.get_input_output()] = rate
 
     def extrapolate(self, temp=100):
-        for rate in list(self.rates.keys()):
+        for rate in self.rates.keys():
             self.rates[rate].extrapolate(temp)
 
     def print_rates(self):
-        for rate in list(self.rates.keys()):
+        for rate in self.rates.keys():
             print(rate)
         return
 
