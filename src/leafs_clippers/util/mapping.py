@@ -307,17 +307,6 @@ class SimpleConservativeRemap:
         return total_dst
 
     def _remap_3d(self, src_mass):
-        total_dst = np.zeros(self.dst_shape, dtype=np.float64)
-        for z, y, x, zz, yy, xx in itertools.product(
-            range(self.dst_shape[0]),
-            range(self.dst_shape[1]),
-            range(self.dst_shape[2]),
-            range(self.merge[0]),
-            range(self.merge[1]),
-            range(self.merge[2]),
-        ):
-            total_dst[x, y, z] += src_mass[
-                x * self.merge[0] + xx, y * self.merge[1] + yy, z * self.merge[2] + zz
-            ]
+        total_dst = _merge_3d(src_mass, self.dst_shape, self.merge)
 
         return total_dst

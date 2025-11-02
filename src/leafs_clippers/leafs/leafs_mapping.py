@@ -852,12 +852,11 @@ class LeafsMapping:
         species["names"] = self.tracer.isos
         species["count"] = len(self.tracer.isos)
 
-        print(abundgrid.shape)
-        self.abundgrid = abundgrid
+        self.abundgrid = abundgrid.reshape((res, res, res, species["count"]))
 
         if write_files:
             self._write_3D_grid(
-                abundgrid,
+                self.abundgrid,
                 res,
                 res,
                 res,

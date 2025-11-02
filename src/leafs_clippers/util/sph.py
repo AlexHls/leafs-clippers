@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.spatial import cKDTree
 from numba import njit
+from tqdm import trange
 
 _H_DIST_MIN_ = 1e-7
 _W_MIN_ = 1e-16
@@ -132,7 +133,7 @@ def deposit_to_mesh_adaptive(
     mass_field = np.zeros(n_cells, dtype=np.float64)
     species_field = np.zeros((n_cells, s), dtype=np.float64)
 
-    for i in range(n_tracers):
+    for i in trange(n_tracers, desc="Depositing tracers to mesh"):
         hi = float(h_i[i])
         idx_list = mesh_tree.query_ball_point(tracer_pos[i], hi * 2.0, p=2.0)
         if len(idx_list) == 0:
@@ -153,7 +154,7 @@ def deposit_to_mesh_adaptive(
             eps,
         )
 
-        return mass_field, species_field, h_i
+    return mass_field, species_field, h_i
 
 
 def conservative_remap_to_mesh_with_centers(
