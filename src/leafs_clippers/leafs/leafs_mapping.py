@@ -322,7 +322,11 @@ class LeafsMapping:
             method="indirect",
         )
 
-        rho_ejecta = mapper.remap(self.s.density[xinds, yinds, zinds])
+        rho_ejecta = mapper.remap(
+            self.s.density[
+                xinds[:, None, None], yinds[None, :, None], zinds[None, None, :]
+            ]
+        )
 
         # Step 3: remove bound remnant if necessary
         if self.remove_bound_core:
@@ -337,13 +341,16 @@ class LeafsMapping:
             etot = self.s.egrav + ekin + self.s.energy
 
             etot_ejecta = mapper.remap(
-                etot[xinds, yinds, zinds] * self.s.density[xinds, yinds, zinds]
+                etot[xinds[:, None, None], yinds[None, :, None], zinds[None, None, :]]
+                * self.s.density[
+                    xinds[:, None, None], yinds[None, :, None], zinds[None, None, :]
+                ]
             )
 
             # Convert etot_ejecta from erg/cm^3 to erg
             etot_ejecta *= mapper.dst_volumes
 
-            bm = np.logical_and(etot_ejecta < 0.0 and rho_ejecta > vacuum_threshold)
+            bm = np.logical_and(etot_ejecta < 0.0, rho_ejecta > vacuum_threshold)
 
             rho_ejecta = self._get_rhointp(
                 rho_ejecta, bm, res=res, idx_clip=[xinds, yinds, zinds]
