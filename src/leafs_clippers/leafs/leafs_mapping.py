@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from leafs_clippers.leafs import leafs as lc
 from leafs_clippers.leafs import leafs_tracer as lt
-from leafs_clippers.util import const as const
+from leafs_clippers.util import const, sph
 from leafs_clippers.util import utilities as util
 from leafs_clippers.util import radioactivedecay as lrd
 from leafs_clippers.util import mapping as lm
@@ -271,7 +271,7 @@ class LeafsMapping:
 
         return boxsize
 
-    def _get_rhointp(self, rho, bm, res=200, idx_clip=None):
+    def _get_rhointp(self, rho, bm, cell_edges):
         """
         Perform nearest neighbour interpolation of the density field
         to fill in the holes left by removing the bound core.
@@ -280,9 +280,9 @@ class LeafsMapping:
         if not self.quiet:
             print("Interpolating density field to fill the removed bound core...")
 
-        x = np.linspace(-self.boxsize, self.boxsize, res)
-        y = np.linspace(-self.boxsize, self.boxsize, res)
-        z = np.linspace(-self.boxsize, self.boxsize, res)
+        x = 0.5 * (cell_edges[0][:-1] + cell_edges[0][1:])
+        y = 0.5 * (cell_edges[1][:-1] + cell_edges[1][1:])
+        z = 0.5 * (cell_edges[2][:-1] + cell_edges[2][1:])
         xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
 
         input_points = np.array([xx[~bm].ravel(), yy[~bm].ravel(), zz[~bm].ravel()]).T
@@ -352,11 +352,9 @@ class LeafsMapping:
 
             bm = np.logical_and(etot_ejecta < 0.0, rho_ejecta > vacuum_threshold)
 
-            rho_ejecta = self._get_rhointp(
-                rho_ejecta, bm, res=res, idx_clip=[xinds, yinds, zinds]
-            )
+            rho_ejecta = self._get_rhointp(rho_ejecta, bm, mapper.dst_edges)
 
-        return rho_ejecta, mapper.dst_edges
+        return rho_ejecta, mapper.dst_edges, mapper.dst_volumes
 
     def _get_expansion_center(self, vacuum_threshold=1e-4):
         if not self.quiet:
@@ -804,7 +802,7 @@ class LeafsMapping:
         self.s.geomy -= self.center[1]
         self.s.geomz -= self.center[2]
 
-        self.rhointp, self.edges = self._get_rho_ejecta(
+        self.rhointp, self.edges, self.volumes = self._get_rho_ejecta(
             res=res, vacuum_threshold=vacuum_threshold
         )
 
@@ -821,30 +819,31 @@ class LeafsMapping:
             (np.abs(self.tracer.fpos[:, 0]) < self.boxsize)
             & (np.abs(self.tracer.fpos[:, 1]) < self.boxsize)
             & (np.abs(self.tracer.fpos[:, 2]) < self.boxsize)
+            & (self.tracer.rho > vacuum_threshold)
         )
 
         if not self.quiet:
             print(f"Using only {len(ttt)} of {self.tracer.npart} tracers.")
 
-        abundgrid = calcGrid.gatherAbundGrid(
+        x = 0.5 * (self.edges[0][:-1] + self.edges[0][1:])
+        y = 0.5 * (self.edges[1][:-1] + self.edges[1][1:])
+        z = 0.5 * (self.edges[2][:-1] + self.edges[2][1:])
+        xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
+        mesh_centers = np.array([xx.ravel(), yy.ravel(), zz.ravel()]).T
+
+        mass_field, species_field, _ = sph.deposit_to_mesh_adaptive(
             self.tracer.fpos[ttt],
             self.tracer.mass[ttt] * const.M_SOL,
-            self.tracer.rho[ttt],
+            mesh_centers,
             self.tracer.xiso[ttt],
-            nneighbours,
-            res,
-            res,
-            res,
-            2 * self.boxsize,
-            2 * self.boxsize,
-            2 * self.boxsize,
-            0,
-            0,
-            0,
-            densitycut=vacuum_threshold,
-            densityfield=self.rhointp,
-            forceneighbourcount=forceneighbourcount,
-            single_precision=False,
+            n_ngb=nneighbours,
+        )
+        _, _, abundgrid = sph.conservative_remap_to_mesh_with_centers(
+            mesh_centers,
+            mass_field,
+            species_field,
+            self.rhointp.ravel(),
+            self.volumes.ravel(),
         )
 
         species = {}

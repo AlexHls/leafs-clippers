@@ -89,7 +89,7 @@ def _compute_adaptive_h(tracer_pos, n_ngb=32, factor=0.5):
 #########################
 
 
-def deposit_to_mesh_adaptive_numba(
+def deposit_to_mesh_adaptive(
     tracer_pos, tracer_mass, mesh_centers, tracer_x, n_ngb=32, eps=_W_MIN_
 ):
     """
