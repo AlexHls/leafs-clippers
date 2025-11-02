@@ -356,7 +356,7 @@ class LeafsMapping:
                 rho_ejecta, bm, res=res, idx_clip=[xinds, yinds, zinds]
             )
 
-        return rho_ejecta
+        return rho_ejecta, mapper.dst_edges
 
     def _get_expansion_center(self, vacuum_threshold=1e-4):
         if not self.quiet:
@@ -401,9 +401,9 @@ class LeafsMapping:
         resx,
         resy,
         resz,
-        boxx,
-        boxy,
-        boxz,
+        edgex,
+        edgey,
+        edgez,
         cx,
         cy,
         cz,
@@ -459,15 +459,15 @@ class LeafsMapping:
         frho.write("%d\n" % (resx * resy * resz))
         frho.write("%g\n" % (self.s.time / (24.0 * 3600)))
 
+        box = np.max(
+            np.abs([edgex[0], edgex[-1], edgey[0], edgey[-1], edgez[0], edgez[-1]])
+        )
         if not self.quiet:
-            print(f"Velocity: {boxy / self.s.time / 1e5:.2f} km/s")
+            print(f"Velocity: {box / self.s.time / 1e5:.2f} km/s")
 
-        frho.write("%g\n" % (boxy / self.s.time))
+        frho.write("%g\n" % (box / self.s.time))
 
         cellcount = 0
-        xcellsize = 2 * boxx / resx
-        ycellsize = 2 * boxy / resy
-        zcellsize = 2 * boxz / resz
 
         vol = np.zeros((resx, resy, resz))
 
@@ -476,13 +476,17 @@ class LeafsMapping:
         rhogrid[rhogrid <= vacuum_threshold] = 0.0
 
         for k in range(resz):
-            cellz = (k + 0.5) * zcellsize - boxz + cz
+            cellz = 0.5 * (edgez[k] + edgez[k + 1])
             for j in range(resy):
-                celly = (j + 0.5) * ycellsize - boxy + cy
+                celly = 0.5 * (edgey[j] + edgey[j + 1])
                 for i in range(resx):
-                    cellx = (i + 0.5) * xcellsize - boxx + cx
+                    cellx = 0.5 * (edgex[i] + edgex[i + 1])
 
-                    vol[i, j, k] = xcellsize * ycellsize * zcellsize
+                    vol[i, j, k] = (
+                        (edgex[i + 1] - edgex[i])
+                        * (edgey[j + 1] - edgey[j])
+                        * (edgez[k + 1] - edgez[k])
+                    )
 
                     cellcount += 1
 
@@ -800,7 +804,9 @@ class LeafsMapping:
         self.s.geomy -= self.center[1]
         self.s.geomz -= self.center[2]
 
-        self.rhointp = self._get_rho_ejecta(res=res, vacuum_threshold=vacuum_threshold)
+        self.rhointp, self.edges = self._get_rho_ejecta(
+            res=res, vacuum_threshold=vacuum_threshold
+        )
 
         forceneighbourcount = 0
 
