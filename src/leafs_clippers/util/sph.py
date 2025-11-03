@@ -236,7 +236,7 @@ def conservative_remap_to_mesh_with_centers(
         corr = m_species_tracer / (m_species_mesh + eps)
         species_final *= corr[None, :]
 
-    x_final = species_final / mass_final[:, None]
+    x_final = species_final / (mass_final[:, None] + eps)
     x_final[mass_final < eps, :] = 0.0
 
     return mass_final, species_final, x_final

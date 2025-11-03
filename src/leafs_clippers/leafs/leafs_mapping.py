@@ -826,7 +826,7 @@ class LeafsMapping:
 
         mass_field, species_field, _ = sph.deposit_to_mesh_adaptive(
             self.tracer.fpos[ttt],
-            self.tracer.mass[ttt] * const.M_SOL,
+            self.tracer.mass[ttt],
             mesh_centers,
             self.tracer.xiso[ttt],
             n_ngb=nneighbours,
@@ -837,6 +837,9 @@ class LeafsMapping:
             species_field,
             self.rhointp.ravel(),
             self.volumes.ravel(),
+            vacuum_threshold=vacuum_threshold,
+            tracer_mass=self.tracer.mass[ttt],
+            tracer_x=self.tracer.xiso[ttt],
         )
 
         species = {}
