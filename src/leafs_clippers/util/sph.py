@@ -161,6 +161,7 @@ def deposit_to_mesh_adaptive(
 
 
 def conservative_remap_to_mesh_with_centers(
+    mesh_centers,
     mass_field,
     species_field,
     mesh_rho,
@@ -176,6 +177,8 @@ def conservative_remap_to_mesh_with_centers(
 
     Parameters
     ----------
+    mesh_centers : ndarray
+        Array of shape (M, D) containing the centers of the mesh cells.
     mass_field : ndarray
         Array of shape (M,) containing the deposited mass in each mesh cell.
     species_field : ndarray
@@ -213,6 +216,9 @@ def conservative_remap_to_mesh_with_centers(
     """
 
     n_cells = mass_field.shape[0]
+    if bound_mask is None:
+        bound_mask = np.zeros(n_cells, dtype=bool)
+
     mesh_rho_valid = mesh_rho.copy()
     mesh_rho_valid[mesh_rho_valid < vacuum_threshold] = 0.0
     mesh_mass = mesh_rho_valid * cell_volume
@@ -233,11 +239,25 @@ def conservative_remap_to_mesh_with_centers(
     # If tracer data is provided, renormalize species abundances
     if tracer_mass is not None and tracer_x is not None:
         m_species_tracer = np.sum(tracer_mass[:, None] * tracer_x, axis=0)
-        if bound_mask is None:
-            bound_mask = np.zeros(n_cells, dtype=bool)
         m_species_mesh = np.sum(species_final[~bound_mask], axis=0)
         corr = m_species_tracer / (m_species_mesh + eps)
         species_final[~bound_mask] *= corr[None, :]
+
+    # Nearest neighbor interpolation for empty cells
+    missing_mask = np.logical_and(mass_final < eps, mesh_rho >= vacuum_threshold)
+    missing_mask = np.logical_or(missing_mask, bound_mask)
+    if np.any(missing_mask):
+        empty_idx = np.where(missing_mask)[0]
+        nonempty_idx = np.where(~missing_mask)[0]
+        if nonempty_idx.size > 0:
+            tree = cKDTree(mesh_centers[nonempty_idx])
+            nearest = tree.query(mesh_centers[empty_idx], k=1)[1]
+            x_nonempty = species_final[nonempty_idx, :] / (
+                mass_final[nonempty_idx][:, None] + eps
+            )
+            x_copy = x_nonempty[nearest, :]
+            species_final[empty_idx, :] = x_copy * mesh_mass[empty_idx][:, None]
+            mass_final[empty_idx] = mesh_mass[empty_idx]
 
     x_final = species_final / (mass_final[:, None] + eps)
     x_final[mass_final < eps, :] = 0.0

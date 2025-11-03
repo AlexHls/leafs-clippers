@@ -834,6 +834,7 @@ class LeafsMapping:
             n_ngb=nneighbours,
         )
         _, _, abundgrid = sph.conservative_remap_to_mesh_with_centers(
+            mesh_centers,
             mass_field,
             species_field,
             self.rhointp.ravel(),
