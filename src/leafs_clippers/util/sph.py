@@ -161,7 +161,6 @@ def deposit_to_mesh_adaptive(
 
 
 def conservative_remap_to_mesh_with_centers(
-    mesh_centers,
     mass_field,
     species_field,
     mesh_rho,
@@ -169,6 +168,7 @@ def conservative_remap_to_mesh_with_centers(
     vacuum_threshold=1e-4,
     tracer_mass=None,
     tracer_x=None,
+    bound_mask=None,
     eps=_M_MIN_,
 ):
     """
@@ -176,8 +176,6 @@ def conservative_remap_to_mesh_with_centers(
 
     Parameters
     ----------
-    mesh_centers : ndarray
-        Array of shape (M, D) containing the centers of the mesh cells.
     mass_field : ndarray
         Array of shape (M,) containing the deposited mass in each mesh cell.
     species_field : ndarray
@@ -197,6 +195,9 @@ def conservative_remap_to_mesh_with_centers(
         Array of shape (N, S) containing species information for each tracer particle. If given together
         with tracer_mass, it is used to renormalize the species abundances of the
         target mesh.
+    bound_mask : ndarray of bool, optional
+        Array of shape (M,) indicating which mesh cells are bound. If provided,
+        these cells will be ignored during the abundance renormalization step.
     eps : float
         Small value to avoid division by zero.
 
@@ -232,9 +233,11 @@ def conservative_remap_to_mesh_with_centers(
     # If tracer data is provided, renormalize species abundances
     if tracer_mass is not None and tracer_x is not None:
         m_species_tracer = np.sum(tracer_mass[:, None] * tracer_x, axis=0)
-        m_species_mesh = np.sum(species_final, axis=0)
+        if bound_mask is None:
+            bound_mask = np.zeros(n_cells, dtype=bool)
+        m_species_mesh = np.sum(species_final[~bound_mask], axis=0)
         corr = m_species_tracer / (m_species_mesh + eps)
-        species_final *= corr[None, :]
+        species_final[~bound_mask] *= corr[None, :]
 
     x_final = species_final / (mass_final[:, None] + eps)
     x_final[mass_final < eps, :] = 0.0

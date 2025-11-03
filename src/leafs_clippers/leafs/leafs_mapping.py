@@ -353,8 +353,10 @@ class LeafsMapping:
             bm = np.logical_and(etot_ejecta < 0.0, rho_ejecta > vacuum_threshold)
 
             rho_ejecta = self._get_rhointp(rho_ejecta, bm, mapper.dst_edges)
+        else:
+            bm = np.zeros(rho_ejecta.shape, dtype=bool)
 
-        return rho_ejecta, mapper.dst_edges, mapper.dst_volumes
+        return rho_ejecta, mapper.dst_edges, mapper.dst_volumes, bm
 
     def _get_expansion_center(self, vacuum_threshold=1e-4):
         if not self.quiet:
@@ -797,7 +799,7 @@ class LeafsMapping:
         self.s.geomy -= self.center[1]
         self.s.geomz -= self.center[2]
 
-        self.rhointp, self.edges, self.volumes = self._get_rho_ejecta(
+        self.rhointp, self.edges, self.volumes, self.bound_mask = self._get_rho_ejecta(
             res=res, vacuum_threshold=vacuum_threshold
         )
 
@@ -832,7 +834,6 @@ class LeafsMapping:
             n_ngb=nneighbours,
         )
         _, _, abundgrid = sph.conservative_remap_to_mesh_with_centers(
-            mesh_centers,
             mass_field,
             species_field,
             self.rhointp.ravel(),
@@ -840,6 +841,7 @@ class LeafsMapping:
             vacuum_threshold=vacuum_threshold,
             tracer_mass=self.tracer.mass[ttt],
             tracer_x=self.tracer.xiso[ttt],
+            bound_mask=self.bound_mask.ravel(),
         )
 
         species = {}
