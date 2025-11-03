@@ -781,11 +781,6 @@ class LeafsMapping:
         None
         """
 
-        try:
-            import calcGrid
-        except ImportError:
-            raise ImportError("The calcGrid module is required.")
-
         self.boxsize = self._guess_boxsize(max_vel=max_vel)
         if center_expansion:
             self.center = self._get_expansion_center(vacuum_threshold=vacuum_threshold)
@@ -805,8 +800,6 @@ class LeafsMapping:
         self.rhointp, self.edges, self.volumes = self._get_rho_ejecta(
             res=res, vacuum_threshold=vacuum_threshold
         )
-
-        forceneighbourcount = 0
 
         if not self.quiet:
             print("Calculating abundance grid...")

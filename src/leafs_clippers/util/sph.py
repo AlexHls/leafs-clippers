@@ -4,7 +4,8 @@ from numba import njit
 from tqdm import trange
 
 _H_DIST_MIN_ = 1e-7
-_W_MIN_ = 1e-16
+_W_MIN_ = 1e-99
+_M_MIN_ = 1e-16
 
 ########################
 ### Helper Functions ###
@@ -41,6 +42,8 @@ def _w_m4_scalar(q, h, dim):
 def _deposit_tracer_with_species(
     mass_field, species_field, mesh_idx, r_arr, tracer_mass, tracer_x_row, h, dim, eps
 ):
+    # Effectively SNSB with \Delta V = 1
+    # Rottgers & Arth 2018
     n = mesh_idx.shape[0]
     if n == 0:
         return
@@ -158,7 +161,15 @@ def deposit_to_mesh_adaptive(
 
 
 def conservative_remap_to_mesh_with_centers(
-    mesh_centers, mass_field, species_field, mesh_rho, cell_volume, eps=_W_MIN_
+    mesh_centers,
+    mass_field,
+    species_field,
+    mesh_rho,
+    cell_volume,
+    vacuum_threshold=1e-4,
+    tracer_mass=None,
+    tracer_x=None,
+    eps=_M_MIN_,
 ):
     """
     Perform conservative remapping of species fields to ensure mass conservation.
@@ -175,6 +186,17 @@ def conservative_remap_to_mesh_with_centers(
         Array of shape (M,) containing the density of each mesh cell.
     cell_volume : ndarray
         Array of shape (M,) containing the volume of each mesh cell.
+    vacuum_threshold : float
+        Cells with mass below this threshold are considered vacuum and will be
+        set to zero mass.
+    tracer_mass : ndarray, optional
+        Array of shape (N,) containing the mass of each tracer particle. If given together
+        with tracer_x, it is used to renormalize the species abundances of the
+        target mesh.
+    tracer_x : ndarray, optional
+        Array of shape (N, S) containing species information for each tracer particle. If given together
+        with tracer_mass, it is used to renormalize the species abundances of the
+        target mesh.
     eps : float
         Small value to avoid division by zero.
 
@@ -190,29 +212,31 @@ def conservative_remap_to_mesh_with_centers(
     """
 
     n_cells = mass_field.shape[0]
-    mesh_mass = mesh_rho * cell_volume
+    mesh_rho_valid = mesh_rho.copy()
+    mesh_rho_valid[mesh_rho_valid < vacuum_threshold] = 0.0
+    mesh_mass = mesh_rho_valid * cell_volume
     mass_final = np.zeros_like(mass_field)
     species_final = np.zeros_like(species_field)
 
     mask = mass_field > eps
+
+    x_temp = np.zeros_like(species_field)
+    x_temp[mask, :] = species_field[mask, :] / mass_field[mask][:, None]
+
     scale_factors = np.zeros(n_cells, dtype=np.float64)
     scale_factors[mask] = mesh_mass[mask] / mass_field[mask]
     mass_final[mask] = mesh_mass[mask]
-    species_final[mask, :] = species_field[mask, :] * scale_factors[mask][:, None]
+    species_final = x_temp * mesh_mass[:, None]
+    species_final[mesh_rho < vacuum_threshold, :] = 0.0
 
-    if not np.all(mask):
-        nonempty_idx = np.where(mask)[0]
-        empty_idx = np.where(~mask)[0]
-        if nonempty_idx.size > 0:
-            tree = cKDTree(mesh_centers[nonempty_idx])
-            nearest = tree.query(mesh_centers[empty_idx], k=1)[1]
-            x_nonempty = (
-                species_final[nonempty_idx, :] / mass_final[nonempty_idx][:, None]
-            )
-            x_copy = x_nonempty[nearest, :]
-            species_final[empty_idx, :] = x_copy * mesh_mass[empty_idx][:, None]
-            mass_final[empty_idx] = mesh_mass[empty_idx]
+    # If tracer data is provided, renormalize species abundances
+    if tracer_mass is not None and tracer_x is not None:
+        m_species_tracer = np.sum(tracer_mass[:, None] * tracer_x, axis=0)
+        m_species_mesh = np.sum(species_final, axis=0)
+        corr = m_species_tracer / (m_species_mesh + eps)
+        species_final *= corr[None, :]
 
     x_final = species_final / mass_final[:, None]
+    x_final[mass_final < eps, :] = 0.0
 
     return mass_final, species_final, x_final
