@@ -416,7 +416,7 @@ class LeafsMapping:
             self.tracer.xiso[ttt],
             n_ngb=n_ngb,
         )
-        _, _, abundgrid = sph.conservative_remap_to_mesh_with_centers(
+        _, speciesgrid, abundgrid = sph.conservative_remap_to_mesh_with_centers(
             mesh_centers,
             mass_field,
             species_field,
@@ -429,7 +429,9 @@ class LeafsMapping:
             replace_bound_region=replace_bound_region,
         )
 
-        return abundgrid.reshape((res, res, res, len(self.tracer.isos)))
+        return abundgrid.reshape(
+            (res, res, res, len(self.tracer.isos))
+        ), speciesgrid.reshape((res, res, res, len(self.tracer.isos)))
 
     def _arepo_tracer_map(
         self, ttt, n_ngb=32, vacuum_threshold=1e-4, res=200, forceneighbourcount=0
@@ -902,7 +904,7 @@ class LeafsMapping:
             print(f"Using only {len(ttt)} of {self.tracer.npart} tracers.")
 
         if sph_method == "snsb":
-            self.abundgrid = self._snsb_tracer_map(
+            self.abundgrid, self.speciesgrid = self._snsb_tracer_map(
                 ttt,
                 n_ngb=nneighbours,
                 vacuum_threshold=vacuum_threshold,
