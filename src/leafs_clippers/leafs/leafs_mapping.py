@@ -833,6 +833,7 @@ class LeafsMapping:
         replace_bound_region=True,
         sph_method="arepo",
         normalize_abundances=True,
+        decay_time=0.0,
     ):
         """
         Map the TPPNP abundances to the LEAFS model.
@@ -864,6 +865,9 @@ class LeafsMapping:
         normalize_abundances : bool, optional
             If sph_method is 'snsb', normalize the abundances to recover the total
             abundances found in the tracers. Default: True.
+        decay_time : float, optional
+            If decay_time > 0, all radioactive isotopes will be decayed by decay_time.
+            Time has to be in days. Default: 0.0.
 
         Returns
         -------
@@ -931,6 +935,25 @@ class LeafsMapping:
             )
         else:
             raise ValueError("This should never happen.")
+
+        if decay_time > 0:
+            if not self.quiet:
+                print("Doing radioactive decay...")
+            rd = lrd.RadioactiveDecay(
+                self.abundgrid.ravel(),
+                (self.rhointp * self.volumes).ravel(),
+                self.tracer.isos,
+                exclude=[x.capitalize() for x in radioactives],
+            )
+            abundances_decayed = rd.decay(decay_time)
+            self.abundgrid = abundances_decayed.reshape(
+                (res, res, res, len(self.tracer.isos))
+            )
+            if not self.quiet:
+                print("Decay complete.")
+
+        if np.any(self.abundgrid > 1.0):
+            raise ValueError("This shouldn't happen")
 
         species = {}
         species["na"] = self.tracer.a

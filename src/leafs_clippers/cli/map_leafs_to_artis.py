@@ -42,6 +42,7 @@ def main(
             center_expansion=center_expansion,
             overwrite=overwrite,
             replace_bound_region=replace_bound_region,
+            decay_time=decay_time,
         )
 
     return
