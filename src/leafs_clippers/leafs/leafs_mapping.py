@@ -293,7 +293,9 @@ class LeafsMapping:
 
         return interp(xx, yy, zz)
 
-    def _get_rho_ejecta(self, res=200, vacuum_threshold=1e-4):
+    def _get_rho_ejecta(
+        self, res=200, vacuum_threshold=1e-4, replace_bound_region=True
+    ):
         if not self.quiet:
             print("Calculating ejecta density field...")
 
@@ -352,7 +354,8 @@ class LeafsMapping:
 
             bm = np.logical_and(etot_ejecta < 0.0, rho_ejecta > vacuum_threshold)
 
-            rho_ejecta = self._get_rhointp(rho_ejecta, bm, mapper.dst_edges)
+            if replace_bound_region:
+                rho_ejecta = self._get_rhointp(rho_ejecta, bm, mapper.dst_edges)
         else:
             bm = np.zeros(rho_ejecta.shape, dtype=bool)
 
@@ -394,6 +397,65 @@ class LeafsMapping:
         if not self.quiet:
             print("Center of expansion: {0}".format(opt.x))
         return opt.x
+
+    def _snsb_tracer_map(self, ttt, n_ngb=32, vacuum_threshold=1e-4, res=200):
+        x = 0.5 * (self.edges[0][:-1] + self.edges[0][1:])
+        y = 0.5 * (self.edges[1][:-1] + self.edges[1][1:])
+        z = 0.5 * (self.edges[2][:-1] + self.edges[2][1:])
+        xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
+        mesh_centers = np.array([xx.ravel(), yy.ravel(), zz.ravel()]).T
+
+        mass_field, species_field, _ = sph.deposit_to_mesh_adaptive(
+            self.tracer.fpos[ttt],
+            self.tracer.mass[ttt],
+            mesh_centers,
+            self.tracer.xiso[ttt],
+            n_ngb=n_ngb,
+        )
+        _, _, abundgrid = sph.conservative_remap_to_mesh_with_centers(
+            mesh_centers,
+            mass_field,
+            species_field,
+            self.rhointp.ravel(),
+            self.volumes.ravel(),
+            vacuum_threshold=vacuum_threshold,
+            tracer_mass=self.tracer.mass[ttt],
+            tracer_x=self.tracer.xiso[ttt],
+            bound_mask=self.bound_mask.ravel(),
+        )
+
+        return abundgrid.reshape((res, res, res, len(self.tracer.isos)))
+
+    def _arepo_tracer_map(
+        self, ttt, n_ngb=32, vacuum_threshold=1e-4, res=200, forceneighbourcount=0
+    ):
+        try:
+            import calcGrid
+        except ImportError:
+            raise ImportError("The calcGrid module is required.")
+
+        _abundgrid = calcGrid.gatherAbundGrid(
+            self.tracer.fpos[ttt],
+            self.tracer.mass[ttt],
+            self.tracer.rho[ttt],
+            self.tracer.xiso[ttt],
+            n_ngb,
+            res,
+            res,
+            res,
+            2 * self.boxsize,
+            2 * self.boxsize,
+            2 * self.boxsize,
+            0,
+            0,
+            0,
+            densitycut=vacuum_threshold,
+            densityfield=self.rhointp,
+            forceneighbourcount=forceneighbourcount,
+            single_precision=False,
+        )
+
+        return _abundgrid
 
     def _write_3D_grid(
         self,
@@ -755,6 +817,8 @@ class LeafsMapping:
         nneighbours=32,
         write_files=True,
         overwrite=False,
+        replace_bound_region=True,
+        sph_method="arepo",
     ):
         """
         Map the TPPNP abundances to the LEAFS model.
@@ -777,11 +841,21 @@ class LeafsMapping:
             Write the ARTIS files. Default: True.
         overwrite : bool, optional
             Overwrite existing files. Default: False.
+        replace_bound_region : bool, optional
+            If given and the bound core is removed, the empty region will be filled
+            using nearest neighbour interpolation. Default: True.
+        sph_method : str, optional
+            Defines which tracer mapping method to use. Options are 'arepo' and 'snsb'.
+            'snsb' is not recommended and only implemented for comparion purposes.
 
         Returns
         -------
         None
         """
+        assert sph_method in [
+            "arepo",
+            "snsb",
+        ], "sph_method must be either 'arepo' or 'snsb'"
 
         self.boxsize = self._guess_boxsize(max_vel=max_vel)
         if center_expansion:
@@ -800,7 +874,9 @@ class LeafsMapping:
         self.s.geomz -= self.center[2]
 
         self.rhointp, self.edges, self.volumes, self.bound_mask = self._get_rho_ejecta(
-            res=res, vacuum_threshold=vacuum_threshold
+            res=res,
+            vacuum_threshold=vacuum_threshold,
+            replace_bound_region=replace_bound_region,
         )
 
         if not self.quiet:
@@ -820,38 +896,22 @@ class LeafsMapping:
         if not self.quiet:
             print(f"Using only {len(ttt)} of {self.tracer.npart} tracers.")
 
-        x = 0.5 * (self.edges[0][:-1] + self.edges[0][1:])
-        y = 0.5 * (self.edges[1][:-1] + self.edges[1][1:])
-        z = 0.5 * (self.edges[2][:-1] + self.edges[2][1:])
-        xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
-        mesh_centers = np.array([xx.ravel(), yy.ravel(), zz.ravel()]).T
-
-        mass_field, species_field, _ = sph.deposit_to_mesh_adaptive(
-            self.tracer.fpos[ttt],
-            self.tracer.mass[ttt],
-            mesh_centers,
-            self.tracer.xiso[ttt],
-            n_ngb=nneighbours,
-        )
-        _, _, abundgrid = sph.conservative_remap_to_mesh_with_centers(
-            mesh_centers,
-            mass_field,
-            species_field,
-            self.rhointp.ravel(),
-            self.volumes.ravel(),
-            vacuum_threshold=vacuum_threshold,
-            tracer_mass=self.tracer.mass[ttt],
-            tracer_x=self.tracer.xiso[ttt],
-            bound_mask=self.bound_mask.ravel(),
-        )
+        if sph_method == "snsb":
+            self.abundgrid = self._snsb_tracer_map(
+                ttt, n_ngb=nneighbours, vacuum_threshold=vacuum_threshold, res=res
+            )
+        elif sph_method == "arepo":
+            self.abundgrid = self._arepo_tracer_map(
+                ttt, nneighbours, vacuum_threshold, res
+            )
+        else:
+            raise ValueError("This should never happen.")
 
         species = {}
         species["na"] = self.tracer.a
         species["nz"] = self.tracer.z
         species["names"] = self.tracer.isos
         species["count"] = len(self.tracer.isos)
-
-        self.abundgrid = abundgrid.reshape((res, res, res, species["count"]))
 
         if write_files:
             self._write_3D_grid(
