@@ -398,7 +398,9 @@ class LeafsMapping:
             print("Center of expansion: {0}".format(opt.x))
         return opt.x
 
-    def _snsb_tracer_map(self, ttt, n_ngb=32, vacuum_threshold=1e-4, res=200):
+    def _snsb_tracer_map(
+        self, ttt, n_ngb=32, vacuum_threshold=1e-4, res=200, replace_bound_region=True
+    ):
         x = 0.5 * (self.edges[0][:-1] + self.edges[0][1:])
         y = 0.5 * (self.edges[1][:-1] + self.edges[1][1:])
         z = 0.5 * (self.edges[2][:-1] + self.edges[2][1:])
@@ -422,6 +424,7 @@ class LeafsMapping:
             tracer_mass=self.tracer.mass[ttt],
             tracer_x=self.tracer.xiso[ttt],
             bound_mask=self.bound_mask.ravel(),
+            replace_bound_region=replace_bound_region,
         )
 
         return abundgrid.reshape((res, res, res, len(self.tracer.isos)))
@@ -897,17 +900,12 @@ class LeafsMapping:
             print(f"Using only {len(ttt)} of {self.tracer.npart} tracers.")
 
         if sph_method == "snsb":
-            if replace_bound_region and self.remove_bound_core:
-                raise ValueError(
-                    "SNSB mapping cannot handle replacing the bound region "
-                    "when the bound core is removed."
-                )
-
             self.abundgrid = self._snsb_tracer_map(
                 ttt,
                 n_ngb=nneighbours,
                 vacuum_threshold=vacuum_threshold,
                 res=res,
+                replace_bound_region=replace_bound_region,
             )
         elif sph_method == "arepo":
             self.abundgrid = self._arepo_tracer_map(

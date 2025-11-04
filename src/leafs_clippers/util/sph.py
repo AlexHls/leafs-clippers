@@ -171,6 +171,7 @@ def conservative_remap_to_mesh_with_centers(
     tracer_x=None,
     bound_mask=None,
     eps=_M_MIN_,
+    replace_bound_region=True,
 ):
     """
     Perform conservative remapping of species fields to ensure mass conservation.
@@ -201,8 +202,10 @@ def conservative_remap_to_mesh_with_centers(
     bound_mask : ndarray of bool, optional
         Array of shape (M,) indicating which mesh cells are bound. If provided,
         these cells will be ignored during the abundance renormalization step.
-    eps : float
+    eps : float, optional
         Small value to avoid division by zero.
+    replace_bound_region : bool, optional
+        If True, bound regions will be replaced using nearest neighbor interpolation.
 
     Returns
     -------
@@ -245,7 +248,8 @@ def conservative_remap_to_mesh_with_centers(
 
     # Nearest neighbor interpolation for empty cells
     missing_mask = np.logical_and(mass_final < eps, mesh_rho >= vacuum_threshold)
-    missing_mask = np.logical_or(missing_mask, bound_mask)
+    if replace_bound_region:
+        missing_mask = np.logical_or(missing_mask, bound_mask)
     if np.any(missing_mask):
         empty_idx = np.where(missing_mask)[0]
         nonempty_idx = np.where(~missing_mask)[0]
