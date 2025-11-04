@@ -356,6 +356,8 @@ class LeafsMapping:
 
             if replace_bound_region:
                 rho_ejecta = self._get_rhointp(rho_ejecta, bm, mapper.dst_edges)
+            else:
+                rho_ejecta[bm] = 0.0
         else:
             bm = np.zeros(rho_ejecta.shape, dtype=bool)
 
