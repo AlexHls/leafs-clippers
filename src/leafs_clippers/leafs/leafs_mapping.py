@@ -897,12 +897,24 @@ class LeafsMapping:
             print(f"Using only {len(ttt)} of {self.tracer.npart} tracers.")
 
         if sph_method == "snsb":
+            if replace_bound_region and self.remove_bound_core:
+                raise ValueError(
+                    "SNSB mapping cannot handle replacing the bound region "
+                    "when the bound core is removed."
+                )
+
             self.abundgrid = self._snsb_tracer_map(
-                ttt, n_ngb=nneighbours, vacuum_threshold=vacuum_threshold, res=res
+                ttt,
+                n_ngb=nneighbours,
+                vacuum_threshold=vacuum_threshold,
+                res=res,
             )
         elif sph_method == "arepo":
             self.abundgrid = self._arepo_tracer_map(
-                ttt, nneighbours, vacuum_threshold, res
+                ttt,
+                n_ngb=nneighbours,
+                vacuum_threshold=vacuum_threshold,
+                res=res,
             )
         else:
             raise ValueError("This should never happen.")

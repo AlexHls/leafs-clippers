@@ -16,6 +16,7 @@ def main(
     overwrite=False,
     remove_bound_core=True,
     center_expansion=False,
+    replace_bound_region=True,
 ):
     map = lm.LeafsMapping(
         snappath=snappath,
@@ -40,6 +41,7 @@ def main(
             max_vel=max_vel,
             center_expansion=center_expansion,
             overwrite=overwrite,
+            replace_bound_region=replace_bound_region,
         )
 
     return
@@ -118,6 +120,11 @@ def cli():
         action="store_true",
         help="Center the box around the center of expansion",
     )
+    parser.add_argument(
+        "--no_replace_bound_region",
+        action="store_false",
+        help="Do not replace the bound region with low density material in 3D mapping",
+    )
 
     args = parser.parse_args()
 
@@ -134,6 +141,7 @@ def cli():
         overwrite=args.overwrite,
         remove_bound_core=args.no_remove_bound_core,
         center_expansion=args.center_expansion,
+        replace_bound_region=args.no_replace_bound_region,
     )
 
     return
