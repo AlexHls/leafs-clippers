@@ -401,7 +401,13 @@ class LeafsMapping:
         return opt.x
 
     def _snsb_tracer_map(
-        self, ttt, n_ngb=32, vacuum_threshold=1e-4, res=200, replace_bound_region=True
+        self,
+        ttt,
+        n_ngb=32,
+        vacuum_threshold=1e-4,
+        res=200,
+        replace_bound_region=True,
+        normalize_abundances=True,
     ):
         x = 0.5 * (self.edges[0][:-1] + self.edges[0][1:])
         y = 0.5 * (self.edges[1][:-1] + self.edges[1][1:])
@@ -423,8 +429,8 @@ class LeafsMapping:
             self.rhointp.ravel(),
             self.volumes.ravel(),
             vacuum_threshold=vacuum_threshold,
-            tracer_mass=self.tracer.mass[ttt],
-            tracer_x=self.tracer.xiso[ttt],
+            tracer_mass=self.tracer.mass[ttt] if normalize_abundances else None,
+            tracer_x=self.tracer.xiso[ttt] if normalize_abundances else None,
             bound_mask=self.bound_mask.ravel(),
             replace_bound_region=replace_bound_region,
         )
@@ -826,6 +832,7 @@ class LeafsMapping:
         overwrite=False,
         replace_bound_region=True,
         sph_method="arepo",
+        normalize_abundances=True,
     ):
         """
         Map the TPPNP abundances to the LEAFS model.
@@ -854,6 +861,9 @@ class LeafsMapping:
         sph_method : str, optional
             Defines which tracer mapping method to use. Options are 'arepo' and 'snsb'.
             'snsb' is not recommended and only implemented for comparion purposes.
+        normalize_abundances : bool, optional
+            If sph_method is 'snsb', normalize the abundances to recover the total
+            abundances found in the tracers. Default: True.
 
         Returns
         -------
@@ -910,6 +920,7 @@ class LeafsMapping:
                 vacuum_threshold=vacuum_threshold,
                 res=res,
                 replace_bound_region=replace_bound_region,
+                normalize_abundances=normalize_abundances,
             )
         elif sph_method == "arepo":
             self.abundgrid = self._arepo_tracer_map(
