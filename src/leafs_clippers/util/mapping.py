@@ -28,42 +28,16 @@ def _remap_2d(Lx, Ly, src_data):
     return Lx @ src_data @ Ly.T
 
 
-@njit(parallel=True)
 def _remap_3d(Lx, Ly, Lz, src_data):
     """
-    Equivalent to: np.einsum("Ii,ijk,Jj,Kk->IJK", Lx, src_data, Ly, Lz),
-    but implemented with Numba parallelization for performance.
+    Equivalent to: np.einsum("Ii,ijk,Jj,Kk->IJK", Lx, src_data, Ly, Lz).
     """
-    I_size = Lx.shape[0]
-    J_size = Ly.shape[0]
-    K_size = Lz.shape[0]
+    tmp1 = np.tensordot(Lx, src_data, axes=(1, 0))  # (I, j, k)
 
-    i_size = Lx.shape[1]
-    j_size = Ly.shape[1]
-    k_size = Lz.shape[1]
+    tmp2 = np.tensordot(tmp1, Ly, axes=(1, 1))  # (I, k, J)
+    tmp2 = np.moveaxis(tmp2, -1, 1)  # (I, J, k)
 
-    result = np.zeros((I_size, J_size, K_size), dtype=src_data.dtype)
-
-    for I in prange(I_size):
-        for J in prange(J_size):
-            for K in prange(K_size):
-                sum_val = 0.0
-
-                for i in range(i_size):
-                    Lx_Ii = Lx[I, i]
-
-                    for j in range(j_size):
-                        Ly_Jj = Ly[J, j]
-
-                        product_i_j = Lx_Ii * Ly_Jj
-
-                        for k in range(k_size):
-                            term = product_i_j * src_data[i, j, k] * Lz[K, k]
-                            sum_val += term
-
-                result[I, J, K] = sum_val
-
-    return result
+    return np.tensordot(tmp2, Lz, axes=(2, 1))  # (I, J, K)
 
 
 @njit
