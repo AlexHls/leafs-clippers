@@ -185,7 +185,7 @@ class ConservativeRemap:
         for i in range(self.dim):
             src_n = len(src_edges[i]) - 1
             dst_n = src_n
-            while dst_n // 2 >= dst_shape[i]:
+            while dst_n / 2 >= dst_shape[i] and dst_n % 2 == 0:
                 dst_n //= 2
             _dst_shape.append(dst_n)
         return tuple(_dst_shape)
