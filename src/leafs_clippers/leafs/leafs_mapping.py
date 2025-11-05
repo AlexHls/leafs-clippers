@@ -607,7 +607,11 @@ class LeafsMapping:
             print(f"dr of shells: {self.boxsize / res} cm.")
 
         mass = self.rhointp * self.volumes
-        radius = np.diff(self.edges[0])  # Assumes a cubic box
+        x = 0.5 * (self.edges[0][:-1] + self.edges[0][1:])
+        y = 0.5 * (self.edges[1][:-1] + self.edges[1][1:])
+        z = 0.5 * (self.edges[2][:-1] + self.edges[2][1:])
+        xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
+        radius = np.sqrt(xx**2 + yy**2 + zz**2).ravel()
 
         shell_mass, shell_edges, _ = util.binned_statistic_weighted(
             radius,
