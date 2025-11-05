@@ -1,6 +1,5 @@
 import os
 import numpy as np
-from scipy.stats import binned_statistic
 from scipy.optimize import least_squares
 from scipy.interpolate import NearestNDInterpolator
 from tqdm import tqdm
@@ -594,6 +593,99 @@ class LeafsMapping:
 
         return
 
+    def _map1D_from_3D(
+        self,
+        res=100,
+        vacuum_threshold=1e-4,
+        decay_time=0.0,
+        radioactives=["ni56", "co56", "fe52", "cr48"],
+    ):
+        if not self.quiet:
+            print("Calculating 1D mapping...")
+            print(f"Max radius: {self.boxsize} cm.")
+            print(f"Number of shells: {res}.")
+            print(f"dr of shells: {self.boxsize / res} cm.")
+
+        mass = self.rhointp * self.volumes
+        radius = np.diff(self.edges[0])  # Assumes a cubic box
+
+        shell_mass, shell_edges, _ = util.binned_statistic_weighted(
+            radius,
+            mass.ravel(),
+            weights=np.ones_like(radius),
+            bins=res,
+            range=[0.0, self.boxsize],
+            statistic="sum",
+        )
+
+        shell_iso = np.zeros([res, len(self.tracer.isos)])
+        for iso in range(len(self.tracer.isos)):
+            shell_iso[:, iso], _, _ = util.binned_statistic_weighted(
+                radius,
+                self.abundgrid[:, :, :, iso].ravel(),
+                weights=mass.ravel(),
+                bins=res,
+                range=[0.0, self.boxsize],
+                statistic="sum",
+            )
+
+        shell_rho = shell_mass / (
+            4.0 / 3.0 * np.pi * (shell_edges[1:] ** 3 - shell_edges[:-1] ** 3)
+        )
+
+        for i in range(res):
+            if shell_rho[i] <= vacuum_threshold:
+                shell_iso[i, :] = 0.0
+
+        if decay_time > 0:
+            print("Doing radioactive decay...")
+            rd = lrd.RadioactiveDecay(
+                shell_iso,
+                shell_mass,
+                self.tracer.isos,
+                exclude=[x.capitalize() for x in radioactives],
+            )
+            shell_iso = rd.decay(decay_time)
+
+        if np.any(shell_iso > 1.0):
+            raise ValueError("This shouldn't happen")
+
+        zm = int(max(self.tracer.z) + 1)
+        shell_abund = np.zeros([res, zm])
+        for iz in range(zm):
+            if iz > self.max_element - 1:
+                # Bin all elements above the maximum element into iron to
+                # ensure mass conservation. Implicitly assumes max_element > 26.
+                shell_abund[:, 26] += shell_iso[:, self.tracer.z == iz].sum(axis=1)
+            else:
+                shell_abund[:, iz] = shell_iso[:, self.tracer.z == iz].sum(axis=1)
+
+        shell_ige = shell_iso[:, 21:].sum(axis=1)
+
+        shell_rad = np.zeros([res, len(radioactives)])
+        for i in range(len(radioactives)):
+            ispecies = self.tracer.isos.index(radioactives[i])
+            shell_rad[:, i] = shell_iso[:, ispecies]
+
+        for i in range(res):
+            if shell_rho[i] <= vacuum_threshold:
+                shell_abund[i, :] = 0.0
+                shell_iso[i, :] = 0.0
+                shell_ige[i] = 0.0
+                shell_rad[i, :] = 0.0
+                shell_rho[i] = 0.0
+
+        shell_radius = 0.5 * (shell_edges[1:] + shell_edges[:-1])
+        shell_vel = shell_radius / self.s.time / 1e5
+
+        self.shell_rho = shell_rho
+        self.shell_abund = shell_abund
+        self.shell_iso = shell_iso
+        self.shell_ige = shell_ige
+        self.shell_vel = shell_vel
+
+        return shell_rho, shell_abund, shell_iso, shell_ige, shell_rad, shell_vel
+
     def _write_1D_grid(
         self,
         shell_rho,
@@ -698,10 +790,10 @@ class LeafsMapping:
 
         if not self.quiet:
             print("Calculating 1D mapping...")
-            print(f"Max radius: {0.5 * self.boxsize} cm.")
+            print(f"Max radius: {self.boxsize} cm.")
             print(f"Min radius: {rad_bound} cm.")
             print(f"Number of shells: {res}.")
-            print(f"dr of shells: {0.5 * self.boxsize / res} cm.")
+            print(f"dr of shells: {self.boxsize / res} cm.")
 
         shell_n, _ = np.histogram(
             self.tracer.frad, bins=res, range=[rad_bound, self.boxsize]
@@ -843,6 +935,7 @@ class LeafsMapping:
         sph_method="arepo",
         normalize_abundances=True,
         decay_time=0.0,
+        map1D=True,
     ):
         """
         Map the TPPNP abundances to the LEAFS model.
@@ -877,6 +970,9 @@ class LeafsMapping:
         decay_time : float, optional
             If decay_time > 0, all radioactive isotopes will be decayed by decay_time.
             Time has to be in days. Default: 0.0.
+        map1D : bool, optional
+            If True, perform a 1D average of the 3D grid and write out 1D files as well.
+            Resulution will be res//2. Default: True.
 
         Returns
         -------
@@ -987,6 +1083,31 @@ class LeafsMapping:
                 vacuum_threshold,
                 nneighbours,
                 res,
+                overwrite,
+            )
+
+        if map1D:
+            if not self.quiet:
+                print("Calculating 1D average of 3D grid...")
+            shell_rho, shell_abund, shell_iso, shell_ige, shell_rad, shell_vel = (
+                self._map1D_from_3D(
+                    res=res // 2,
+                    vacuum_threshold=vacuum_threshold,
+                    decay_time=decay_time,
+                    radioactives=radioactives,
+                )
+            )
+            self._write_1D_grid(
+                shell_rho,
+                shell_abund,
+                shell_iso,
+                shell_ige,
+                shell_rad,
+                shell_vel,
+                res // 2,
+                self.boxsize,
+                vacuum_threshold,
+                radioactives,
                 overwrite,
             )
 
