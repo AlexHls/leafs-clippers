@@ -949,7 +949,7 @@ class LeafsMapping:
             if not self.quiet:
                 print("Doing radioactive decay...")
             rd = lrd.RadioactiveDecay(
-                self.abundgrid.ravel(),
+                self.abundgrid.ravel().reshape(-1, len(self.tracer.isos)),
                 (self.rhointp * self.volumes).ravel(),
                 self.tracer.isos,
                 exclude=[x.capitalize() for x in radioactives],
