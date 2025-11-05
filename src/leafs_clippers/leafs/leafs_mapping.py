@@ -492,30 +492,20 @@ class LeafsMapping:
         grid = np.zeros((resx, resy, resz, self.max_element))
         gridradioactives = np.zeros((resx, resy, resz, len(radioactives)))
         grid_ige = np.zeros((resx, resy, resz))
-        grid_abar = np.zeros((resx, resy, resz))
-        grid_stable = np.zeros((resx, resy, resz))
 
         nspecies = species["count"]
         for i in range(nspecies):
-            if species["nz"][i] > 0 and species["nz"][i] <= self.max_element:
-                grid[:, :, :, int(species["nz"][i] - 1)] += abundgrid[:, :, :, i]
-                # Check for iron group elements
-                if species["nz"][i] >= 21:
-                    grid_ige += abundgrid[:, :, :, i]
-                # Compute aber, invert after loop
-                grid_abar += abundgrid[:, :, :, i] / species["na"][i]
+            iz = species["nz"][i]
+            if iz > self.max_element:
+                iz = 26  # Bin all elements above max_element into iron. Assumes max_element > 26
+            grid[:, :, :, int(iz - 1)] += abundgrid[:, :, :, i]
+            # Check for iron group elements
+            if iz >= 21:
+                grid_ige += abundgrid[:, :, :, i]
             # Check for radioactive isotopes
             for j in range(len(radioactives)):
                 if species["names"][i] == radioactives[j]:
                     gridradioactives[:, :, :, j] += abundgrid[:, :, :, i]
-
-        # Compute abar
-        ind1 = grid_abar > 0
-        grid_abar[ind1] = 1.0 / grid_abar[ind1]
-        grid_abar[~ind1] = 0.0
-
-        # Compute stable isotopes
-        grid_stable = grid_ige - gridradioactives.sum(axis=3)
 
         gg = grid.sum(axis=3)
         if not self.quiet:
