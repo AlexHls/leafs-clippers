@@ -646,6 +646,7 @@ class LeafsMapping:
         decay_time=0.0,
         write_files=True,
         overwrite=False,
+        center_expansion=False,
     ):
         """
         Map the TPPNP abundances to the LEAFS model in 1D.
@@ -667,9 +668,26 @@ class LeafsMapping:
             Write the ARTIS files. Default: True.
         overwrite : bool, optional
             Overwrite existing files. Default: False.
+        center_expansion : bool, optional
+            Center the box on the expansion center. Default: False.
         """
 
         self.boxsize = self._guess_boxsize(max_vel=max_vel)
+
+        if center_expansion:
+            self.center = self._get_expansion_center(vacuum_threshold=vacuum_threshold)
+        else:
+            self.center = np.array([0.0, 0.0, 0.0])
+
+        # Center data inplace. Overwrites data, probably not ideal,
+        # but it is what it is.
+        self.tracer.fpos[:, 0] -= self.center[0]
+        self.tracer.fpos[:, 1] -= self.center[1]
+        self.tracer.fpos[:, 2] -= self.center[2]
+
+        self.s.geomx -= self.center[0]
+        self.s.geomy -= self.center[1]
+        self.s.geomz -= self.center[2]
 
         # Remove the bound core
         bound_mask = self.s.get_bound_material(vacuum_threshold=vacuum_threshold)
@@ -685,14 +703,14 @@ class LeafsMapping:
             print(f"dr of shells: {0.5 * self.boxsize / res} cm.")
 
         shell_n, _ = np.histogram(
-            self.tracer.frad, bins=res, range=[rad_bound, self.boxsize / 2]
+            self.tracer.frad, bins=res, range=[rad_bound, self.boxsize]
         )
 
         shell_radius, shell_rho, shell_edges = self.s.get_rad_profile(
             "density",
             res=res,
             min_radius=rad_bound,
-            max_radius=0.5 * self.boxsize,
+            max_radius=self.boxsize,
             return_edges=True,
         )
         shell_mass = shell_rho * (
@@ -705,7 +723,7 @@ class LeafsMapping:
                 self.tracer.xiso[:, iso],
                 self.tracer.mass,
                 bins=res,
-                range=[rad_bound, self.boxsize / 2],
+                range=[rad_bound, self.boxsize],
                 statistic="sum",
             )
 
@@ -718,7 +736,7 @@ class LeafsMapping:
             self.tracer.mass,
             np.ones(self.tracer.npart),
             bins=res,
-            range=[rad_bound, self.boxsize / 2],
+            range=[rad_bound, self.boxsize],
             statistic="sum",
         )
 

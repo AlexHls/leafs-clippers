@@ -33,6 +33,7 @@ def main(
             max_vel=max_vel,
             decay_time=decay_time,
             overwrite=overwrite,
+            center_expansion=center_expansion,
         )
     else:
         map.map3D(
