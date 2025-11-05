@@ -2,6 +2,7 @@ import os
 import numpy as np
 from scipy.optimize import least_squares
 from scipy.interpolate import NearestNDInterpolator
+from scipy.stats import binned_statistic
 from tqdm import tqdm
 
 from leafs_clippers.leafs import leafs as lc
@@ -613,10 +614,9 @@ class LeafsMapping:
         xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
         radius = np.sqrt(xx**2 + yy**2 + zz**2).ravel()
 
-        shell_mass, shell_edges, _ = util.binned_statistic_weighted(
+        shell_mass, shell_edges, _ = binned_statistic(
             radius,
             mass.ravel(),
-            weights=np.ones_like(radius),
             bins=res,
             range=[0.0, self.boxsize],
             statistic="sum",
