@@ -468,7 +468,8 @@ class LeafsMapping:
             single_precision=False,
         )
 
-        return _abundgrid
+        # Remove last entry, this does not contain abundances
+        return _abundgrid[:, :, :, :-1]
 
     def _write_3D_grid(
         self,
