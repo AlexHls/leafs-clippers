@@ -142,7 +142,7 @@ def cli():
         "--sph_method",
         type=str,
         default="arepo",
-        options=["arepo", "snsb"],
+        choices=["arepo", "snsb"],
         help="Which tracer mapping method to use. 'snsb' is not recommended and only for testing.",
     )
     parser.add_argument(
