@@ -17,6 +17,9 @@ def main(
     remove_bound_core=True,
     center_expansion=False,
     replace_bound_region=True,
+    map1D=True,
+    sph_method="arepo",
+    normalize_abundances=True,
 ):
     map = lm.LeafsMapping(
         snappath=snappath,
@@ -44,6 +47,9 @@ def main(
             overwrite=overwrite,
             replace_bound_region=replace_bound_region,
             decay_time=decay_time,
+            sph_method=sph_method,
+            normalize_abundances=normalize_abundances,
+            map1D=map1D,
         )
 
     return
@@ -127,6 +133,23 @@ def cli():
         action="store_false",
         help="Do not replace the bound region with low density material in 3D mapping",
     )
+    parser.add_argument(
+        "--no_map1D",
+        action="store_false",
+        help="Do not perform 1D mapping as part of the 3D mapping",
+    )
+    parser.add_argument(
+        "--sph_method",
+        type=str,
+        default="arepo",
+        options=["arepo", "snsb"],
+        help="Which tracer mapping method to use. 'snsb' is not recommended and only for testing.",
+    )
+    parser.add_argument(
+        "--no_normalize_abundances",
+        action="store_false",
+        help="Do not normalize abundances after mapping in 3D mapping. Only for sph_method 'snsb'.",
+    )
 
     args = parser.parse_args()
 
@@ -144,6 +167,9 @@ def cli():
         remove_bound_core=args.no_remove_bound_core,
         center_expansion=args.center_expansion,
         replace_bound_region=args.no_replace_bound_region,
+        sph_method=args.sph_method,
+        map1D=args.no_map1D,
+        normalize_abundances=args.no_normalize_abundances,
     )
 
     return
