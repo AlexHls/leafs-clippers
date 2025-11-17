@@ -720,6 +720,11 @@ class LeafsMapping:
         frho.write("%d\n" % res)
         frho.write("%g\n" % (self.s.time / (24.0 * 3600)))
 
+        # Header for radioactives
+        header_str = "#inputcellid vel_r_max_kmps logrho"
+        for radio in radioactives:
+            header_str += f" X_{radio.capitalize()}"
+
         for i in range(res):
             if shell_rho[i] > 0:
                 frho.write("%d %g %g " % (i + 1, shell_vel[i], np.log10(shell_rho[i])))
