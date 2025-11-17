@@ -684,8 +684,7 @@ class LeafsMapping:
                 shell_rad[i, :] = 0.0
                 shell_rho[i] = 0.0
 
-        shell_radius = 0.5 * (shell_edges[1:] + shell_edges[:-1])
-        shell_vel = shell_radius / self.s.time / 1e5
+        shell_vel = shell_edges[1:] / self.s.time / 1e5
 
         self.shell_rho = shell_rho
         self.shell_abund = shell_abund
@@ -813,7 +812,7 @@ class LeafsMapping:
             self.tracer.frad, bins=res, range=[rad_bound, self.boxsize]
         )
 
-        shell_radius, shell_rho, shell_edges = self.s.get_rad_profile(
+        _, shell_rho, shell_edges = self.s.get_rad_profile(
             "density",
             res=res,
             min_radius=rad_bound,
@@ -908,7 +907,7 @@ class LeafsMapping:
         shell_iso[cutoff:, :] = 0.0
         shell_ige[cutoff:] = 0.0
 
-        shell_vel = shell_radius / self.s.time / 1e5
+        shell_vel = shell_edges[1:] / self.s.time / 1e5
 
         self.shell_rho = shell_rho
         self.shell_abund = shell_abund
