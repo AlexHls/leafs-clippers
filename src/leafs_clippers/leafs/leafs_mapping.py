@@ -525,6 +525,11 @@ class LeafsMapping:
         frho.write("%d\n" % (resx * resy * resz))
         frho.write("%g\n" % (self.s.time / (24.0 * 3600)))
 
+        # Header for radioactives
+        header_str = "#inputcellid pos_x_mid pos_y_mid pos_z_mid rho"
+        for radio in radioactives:
+            header_str += f" X_{radio.capitalize()}"
+
         box = np.max(
             np.abs([edgex[0], edgex[-1], edgey[0], edgey[-1], edgez[0], edgez[-1]])
         )
