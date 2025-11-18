@@ -525,11 +525,6 @@ class LeafsMapping:
         frho.write("%d\n" % (resx * resy * resz))
         frho.write("%g\n" % (self.s.time / (24.0 * 3600)))
 
-        # Header for radioactives
-        header_str = "#inputcellid pos_x_mid pos_y_mid pos_z_mid rho"
-        for radio in radioactives:
-            header_str += f" X_{radio.capitalize()}"
-
         box = np.max(
             np.abs([edgex[0], edgex[-1], edgey[0], edgey[-1], edgez[0], edgez[-1]])
         )
@@ -537,6 +532,13 @@ class LeafsMapping:
             print(f"Velocity: {box / self.s.time / 1e5:.2f} km/s")
 
         frho.write("%g\n" % (box / self.s.time))
+
+        # Header for radioactives
+        header_str = "#inputcellid pos_x_min pos_y_min pos_z_min rho"
+        for radio in radioactives:
+            header_str += f" X_{radio.capitalize()}"
+        header_str += "\n"
+        frho.write(header_str)
 
         cellcount = 0
 
@@ -547,11 +549,11 @@ class LeafsMapping:
         rhogrid[rhogrid <= vacuum_threshold] = 0.0
 
         for k in range(resz):
-            cellz = 0.5 * (edgez[k] + edgez[k + 1])
+            cellz = edgez[k]
             for j in range(resy):
-                celly = 0.5 * (edgey[j] + edgey[j + 1])
+                celly = edgey[j]
                 for i in range(resx):
-                    cellx = 0.5 * (edgex[i] + edgex[i + 1])
+                    cellx = edgex[i]
 
                     vol[i, j, k] = (
                         (edgex[i + 1] - edgex[i])
@@ -562,7 +564,7 @@ class LeafsMapping:
                     cellcount += 1
 
                     frho.write(
-                        "%d %g %g %g %g\n"
+                        "%d %g %g %g %g "
                         % (cellcount, cellx, celly, cellz, rhogrid[i, j, k])
                     )
                     text = format("%g" % grid_ige[i, j, k])
@@ -723,6 +725,8 @@ class LeafsMapping:
         header_str = "#inputcellid vel_r_max_kmps logrho"
         for radio in radioactives:
             header_str += f" X_{radio.capitalize()}"
+        header_str += "\n"
+        frho.write(header_str)
 
         for i in range(res):
             if shell_rho[i] > 0:
