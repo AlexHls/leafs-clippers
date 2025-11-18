@@ -34,12 +34,6 @@ dependencies = [
 [tool.hatch.version]
 path = "src/leafs_clippers/__about__.py"
 
-[tool.hatch.build]
-include = [
-  "leafs_clippers/data/*.json",
-  "leafs_clippers/data/*.dat",
-]
-
 [tool.hatch.metadata]
 allow-direct-references = true
 
