@@ -58,24 +58,22 @@ def get_bound_unbound_ids(
     tp = read_tracer(model=model, snappath=snappath)
     at = tp.last()
 
-    bound = []
-    unbound = []
     off = 1 + 6 + qn + 2 * nlset
 
-    for i in tqdm(range(tp.npart)):
-        idx = i + 1
-        eint = at.data[5, i]
-        egrav = at.data[off, i]
-        ekin = 0.5 * (
-            (at.data[off + 1, i] - rx) ** 2
-            + (at.data[off + 2, i] - ry) ** 2
-            + (at.data[off + 3, i] - rz) ** 2
-        )
-        etot = eint + egrav + ekin
-        if etot >= 0:
-            unbound.append(idx)
-        if etot < 0:
-            bound.append(idx)
+    # Vectorized calculation for better performance
+    idx = np.arange(1, tp.npart + 1)
+    eint = at.data[5, :]
+    egrav = at.data[off, :]
+    ekin = 0.5 * (
+        (at.data[off + 1, :] - rx) ** 2
+        + (at.data[off + 2, :] - ry) ** 2
+        + (at.data[off + 3, :] - rz) ** 2
+    )
+    etot = eint + egrav + ekin
+    
+    # Use boolean indexing to filter particles
+    unbound = idx[etot >= 0]
+    bound = idx[etot < 0]
 
     if writeout:
         np.savetxt(f"{snappath}/unbound.txt", unbound, fmt="%d")

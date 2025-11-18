@@ -49,25 +49,23 @@ def read_1d_artis_model(root_dir=".", nradioactives=4, max_element=30):
     model["data"]["radioactives"] = np.zeros((model["data"]["res"], nradioactives))
     model["abundances"] = np.zeros((model["data"]["res"], max_element))
 
+    # Parse model data more efficiently
     for i in range(model["data"]["res"]):
-        line = lines[i + 2].split()
-        model["data"]["vel"][i] = float(line[1])
-        logrho = float(line[2])
-        if logrho != 0.0:
-            model["data"]["rho"][i] = 10**logrho
-        else:
-            model["data"]["rho"][i] = 0.0
-        model["data"]["ige"][i] = float(line[3])
-        for j in range(nradioactives):
-            model["data"]["radioactives"][i, j] = float(line[4 + j])
+        parts = lines[i + 2].split()
+        model["data"]["vel"][i] = float(parts[1])
+        logrho = float(parts[2])
+        model["data"]["rho"][i] = 10**logrho if logrho != 0.0 else 0.0
+        model["data"]["ige"][i] = float(parts[3])
+        # Parse radioactives in one go
+        model["data"]["radioactives"][i, :] = [float(parts[4 + j]) for j in range(nradioactives)]
 
     with open(os.path.join(root_dir, "abundances_1D.txt"), "r") as f:
         lines = f.readlines()
 
+    # Parse abundances more efficiently
     for i in range(model["data"]["res"]):
-        line = lines[i].split()
-        for j in range(max_element):
-            model["abundances"][i, j] = float(line[j + 1])
+        parts = lines[i].split()
+        model["abundances"][i, :] = [float(parts[j + 1]) for j in range(max_element)]
 
     return model
 
@@ -541,6 +539,10 @@ class LeafsMapping:
 
         rhogrid[rhogrid <= vacuum_threshold] = 0.0
 
+        # Build output strings in memory for better I/O performance
+        rho_lines = []
+        abund_lines = []
+        
         for k in range(resz):
             cellz = 0.5 * (edgez[k] + edgez[k + 1])
             for j in range(resy):
@@ -556,19 +558,25 @@ class LeafsMapping:
 
                     cellcount += 1
 
-                    frho.write(
+                    # Build rho line
+                    rho_lines.append(
                         "%d %g %g %g %g\n"
                         % (cellcount, cellx, celly, cellz, rhogrid[i, j, k])
                     )
                     text = format("%g" % grid_ige[i, j, k])
                     for l in range(len(radioactives)):
                         text += format(" %g" % gridradioactives[i, j, k, l])
-                    frho.write(text + "\n")
+                    rho_lines.append(text + "\n")
 
+                    # Build abundance line
                     abtext = format("%d" % cellcount)
                     for l in range(self.max_element):
                         abtext += format(" %g" % grid[i, j, k, l])
-                    fabund.write(abtext + "\n")
+                    abund_lines.append(abtext + "\n")
+
+        # Write all lines at once for better I/O performance
+        frho.writelines(rho_lines)
+        fabund.writelines(abund_lines)
 
         if not self.quiet:
             print("Total mass: %g" % ((rhogrid * vol).sum() / const.M_SOL))
