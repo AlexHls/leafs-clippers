@@ -534,8 +534,10 @@ class LeafsMapping:
         frho.write("%g\n" % (box / self.s.time))
 
         # Header for radioactives
-        header_str = "#inputcellid pos_x_min pos_y_min pos_z_min rho"
+        header_str = "#inputcellid pos_x_min pos_y_min pos_z_min rho X_Fegroup"
         for radio in radioactives:
+            if radio not in self.tracer.isos:
+                raise ValueError(f"Radioactive isotope {radio} not found in species.")
             header_str += f" X_{radio.capitalize()}"
         header_str += "\n"
         frho.write(header_str)
@@ -722,8 +724,10 @@ class LeafsMapping:
         frho.write("%g\n" % (self.s.time / (24.0 * 3600)))
 
         # Header for radioactives
-        header_str = "#inputcellid vel_r_max_kmps logrho"
+        header_str = "#inputcellid vel_r_max_kmps logrho X_Fegroup"
         for radio in radioactives:
+            if radio not in self.tracer.isos:
+                raise ValueError(f"Radioactive isotope {radio} not found in species.")
             header_str += f" X_{radio.capitalize()}"
         header_str += "\n"
         frho.write(header_str)
