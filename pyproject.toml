@@ -34,6 +34,12 @@ dependencies = [
 [tool.hatch.version]
 path = "src/leafs_clippers/__about__.py"
 
+[tool.hatch.build]
+include = [
+  "leafs_clippers/data/*.json",
+  "leafs_clippers/data/*.dat",
+]
+
 [tool.hatch.metadata]
 allow-direct-references = true
 
@@ -67,3 +73,6 @@ clipper-convert-tohdf5 = "leafs_clippers.cli.convert_leafs_to_hdf5:cli"
 clipper-make-plots = "leafs_clippers.cli.make_leafs_plots:cli"
 clipper-leafs-to-artis = "leafs_clippers.cli.map_leafs_to_artis:cli"
 clipper-process-snapshots = "leafs_clippers.cli.process_snapshots:cli"
+
+[tool.setuptools.package-data]
+"leafs_clippers.data" = ["*.json"]
