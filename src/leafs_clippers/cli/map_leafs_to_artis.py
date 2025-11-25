@@ -23,6 +23,7 @@ def main(
     sph_method="arepo",
     normalize_abundances=True,
     radioactives="default",
+    max_element=30,
 ):
     with (
         r.files("leafs_clippers.data").joinpath("artis_radio_isos.json").open("r") as f
@@ -35,6 +36,7 @@ def main(
         model=model,
         simulation_type=simulation_type,
         remove_bound_core=remove_bound_core,
+        max_element=max_element,
     )
 
     if one_dim:
@@ -167,6 +169,12 @@ def cli():
         choices=["default", "tecsne"],
         help="Which set of radioactives to use. Sets are contained in data/artis_radio_isos.json.",
     )
+    parser.add_argument(
+        "--max_element",
+        type=int,
+        default=30,
+        help="Maximum element to include in the mapping",
+    )
 
     args = parser.parse_args()
 
@@ -188,6 +196,7 @@ def cli():
         map1D=args.no_map1D,
         normalize_abundances=args.no_normalize_abundances,
         radioactives=args.radioactives,
+        max_element=args.max_element,
     )
 
     return
