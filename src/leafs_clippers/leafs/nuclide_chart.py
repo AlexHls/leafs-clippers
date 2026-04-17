@@ -210,6 +210,7 @@ class NuclideChart:
         plot_stable_isotopes=False,
         vmin=None,
         vmax=None,
+        show_cbar=True,
     ):
         """
         Plot the network nuclide chart
@@ -254,8 +255,9 @@ class NuclideChart:
         ax.set_ylim(-1, max_z)
 
         # Add colorbar
-        cbar = fig.colorbar(pcm, ax=ax)
-        cbar.set_label(r"$X$")
+        if show_cbar:
+            cbar = fig.colorbar(pcm, ax=ax)
+            cbar.set_label(r"$X$")
 
         ax.set_xlabel("Number of neutrons")
         ax.set_ylabel("Number of protons")
