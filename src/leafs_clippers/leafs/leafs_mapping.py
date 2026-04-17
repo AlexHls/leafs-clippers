@@ -533,6 +533,15 @@ class LeafsMapping:
 
         frho.write("%g\n" % (box / self.s.time))
 
+        # Header for radioactives
+        header_str = "#inputcellid pos_x_min pos_y_min pos_z_min rho X_Fegroup"
+        for radio in radioactives:
+            if radio not in self.tracer.isos:
+                raise ValueError(f"Radioactive isotope {radio} not found in species.")
+            header_str += f" X_{radio.capitalize()}"
+        header_str += "\n"
+        frho.write(header_str)
+
         cellcount = 0
 
         vol = np.zeros((resx, resy, resz))
@@ -542,11 +551,11 @@ class LeafsMapping:
         rhogrid[rhogrid <= vacuum_threshold] = 0.0
 
         for k in range(resz):
-            cellz = 0.5 * (edgez[k] + edgez[k + 1])
+            cellz = edgez[k]
             for j in range(resy):
-                celly = 0.5 * (edgey[j] + edgey[j + 1])
+                celly = edgey[j]
                 for i in range(resx):
-                    cellx = 0.5 * (edgex[i] + edgex[i + 1])
+                    cellx = edgex[i]
 
                     vol[i, j, k] = (
                         (edgex[i + 1] - edgex[i])
@@ -557,7 +566,7 @@ class LeafsMapping:
                     cellcount += 1
 
                     frho.write(
-                        "%d %g %g %g %g\n"
+                        "%d %g %g %g %g "
                         % (cellcount, cellx, celly, cellz, rhogrid[i, j, k])
                     )
                     text = format("%g" % grid_ige[i, j, k])
@@ -679,8 +688,7 @@ class LeafsMapping:
                 shell_rad[i, :] = 0.0
                 shell_rho[i] = 0.0
 
-        shell_radius = 0.5 * (shell_edges[1:] + shell_edges[:-1])
-        shell_vel = shell_radius / self.s.time / 1e5
+        shell_vel = shell_edges[1:] / self.s.time / 1e5
 
         self.shell_rho = shell_rho
         self.shell_abund = shell_abund
@@ -714,6 +722,15 @@ class LeafsMapping:
 
         frho.write("%d\n" % res)
         frho.write("%g\n" % (self.s.time / (24.0 * 3600)))
+
+        # Header for radioactives
+        header_str = "#inputcellid vel_r_max_kmps logrho X_Fegroup"
+        for radio in radioactives:
+            if radio not in self.tracer.isos:
+                raise ValueError(f"Radioactive isotope {radio} not found in species.")
+            header_str += f" X_{radio.capitalize()}"
+        header_str += "\n"
+        frho.write(header_str)
 
         for i in range(res):
             if shell_rho[i] > 0:
@@ -803,7 +820,7 @@ class LeafsMapping:
             self.tracer.frad, bins=res, range=[rad_bound, self.boxsize]
         )
 
-        shell_radius, shell_rho, shell_edges = self.s.get_rad_profile(
+        _, shell_rho, shell_edges = self.s.get_rad_profile(
             "density",
             res=res,
             min_radius=rad_bound,
@@ -898,7 +915,7 @@ class LeafsMapping:
         shell_iso[cutoff:, :] = 0.0
         shell_ige[cutoff:] = 0.0
 
-        shell_vel = shell_radius / self.s.time / 1e5
+        shell_vel = shell_edges[1:] / self.s.time / 1e5
 
         self.shell_rho = shell_rho
         self.shell_abund = shell_abund

@@ -1,4 +1,6 @@
 import argparse
+import json
+import importlib.resources as r
 
 from leafs_clippers.leafs import leafs_mapping as lm
 
@@ -20,13 +22,21 @@ def main(
     map1D=True,
     sph_method="arepo",
     normalize_abundances=True,
+    radioactives="default",
+    max_element=30,
 ):
+    with (
+        r.files("leafs_clippers.data").joinpath("artis_radio_isos.json").open("r") as f
+    ):
+        radioactives_list = json.load(f)[radioactives]
+
     map = lm.LeafsMapping(
         snappath=snappath,
         tppnppath=tppnppath,
         model=model,
         simulation_type=simulation_type,
         remove_bound_core=remove_bound_core,
+        max_element=max_element,
     )
 
     if one_dim:
@@ -37,6 +47,7 @@ def main(
             decay_time=decay_time,
             overwrite=overwrite,
             center_expansion=center_expansion,
+            radioactives=radioactives_list,
         )
     else:
         map.map3D(
@@ -50,6 +61,7 @@ def main(
             sph_method=sph_method,
             normalize_abundances=normalize_abundances,
             map1D=map1D,
+            radioactives=radioactives_list,
         )
 
     return
@@ -150,6 +162,19 @@ def cli():
         action="store_false",
         help="Do not normalize abundances after mapping in 3D mapping. Only for sph_method 'snsb'.",
     )
+    parser.add_argument(
+        "--radioactives",
+        type=str,
+        default="default",
+        choices=["default", "tecsne"],
+        help="Which set of radioactives to use. Sets are contained in data/artis_radio_isos.json.",
+    )
+    parser.add_argument(
+        "--max_element",
+        type=int,
+        default=30,
+        help="Maximum element to include in the mapping",
+    )
 
     args = parser.parse_args()
 
@@ -170,6 +195,8 @@ def cli():
         sph_method=args.sph_method,
         map1D=args.no_map1D,
         normalize_abundances=args.no_normalize_abundances,
+        radioactives=args.radioactives,
+        max_element=args.max_element,
     )
 
     return
