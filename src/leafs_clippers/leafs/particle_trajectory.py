@@ -1,3 +1,9 @@
+"""
+Particle trajectory analysis utilities.
+
+This module provides classes for reading and analyzing particle trajectories
+from nuclear reaction network simulations.
+"""
 import os
 import numpy as np
 import matplotlib.pyplot as plt

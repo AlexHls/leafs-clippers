@@ -1,3 +1,9 @@
+"""
+LEAFS to ARTIS mapping utilities.
+
+This module provides tools for mapping LEAFS hydrodynamics simulations
+with TPPNP nucleosynthesis results to ARTIS radiative transfer input formats.
+"""
 import os
 import numpy as np
 from scipy.optimize import least_squares
