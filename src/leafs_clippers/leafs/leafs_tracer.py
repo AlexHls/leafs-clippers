@@ -360,13 +360,11 @@ class LeafsTracer:
                 }
             )
 
-        return False
-
     def attime(self, time, two_d=False):
         # set two_d to avoid getting wrong dictionary entries
 
         fileid = 0
-        while (fileid + 1 < self.nfiles) and (self.starttimes[fileid + 1] < time):
+        while (fileid + 1 < self.nfiles) and (self.starttimes[fileid + 1] <= time):
             fileid += 1
 
         f = open(self.files[fileid], "rb")
