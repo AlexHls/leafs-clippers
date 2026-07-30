@@ -7,17 +7,27 @@ from leafs_clippers.leafs import leafs as lc
 
 
 def read_inipos(filename):
-    data = {}
-    f = FortranFile(filename, "r")
-
-    data["n_bub"] = f.read_ints(np.int32)[0]
-    data["r_bub"] = f.read_reals()[0]
-    data["x"] = f.read_reals()
-    data["y"] = f.read_reals()
-    data["z"] = f.read_reals()
-
-    f.close()
-
+    """
+    Read initial bubble positions from a FORTRAN binary file.
+    
+    Parameters
+    ----------
+    filename : str
+        Path to the FORTRAN file containing initial positions.
+        
+    Returns
+    -------
+    dict
+        Dictionary containing bubble count, radius, and positions.
+    """
+    with FortranFile(filename, "r") as f:
+        data = {
+            "n_bub": f.read_ints(np.int32)[0],
+            "r_bub": f.read_reals()[0],
+            "x": f.read_reals(),
+            "y": f.read_reals(),
+            "z": f.read_reals(),
+        }
     return data
 
 
